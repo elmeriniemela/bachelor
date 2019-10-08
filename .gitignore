@@ -1,0 +1,13 @@
+*.pyc
+.vscode/*
+*.egg-info
+intraQuarter
+*.~lock*
+logs
+data
+nltk_data
+original_files
+10-X_C_*
+parsed
+python3.7-stdlib
+python3.7
