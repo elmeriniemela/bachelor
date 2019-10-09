@@ -1,4 +1,5 @@
 *.pyc
+*.db
 .vscode/*
 *.egg-info
 intraQuarter

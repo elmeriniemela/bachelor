@@ -8,7 +8,7 @@ from helpers import (
 
 
 def master_idx_to_csv(year):
-    OUTPUT_FIELDS = [
+    COLUMNS = [
         'cik',
         'name',
         'form',
@@ -19,7 +19,7 @@ def master_idx_to_csv(year):
     
     with open(C.PARM_PATH + "{}_MASTER.csv".format(year), 'w') as f_out:
         wr = csv.writer(f_out, lineterminator='\n', delimiter=';')
-        wr.writerow(OUTPUT_FIELDS)
+        wr.writerow(COLUMNS)
 
         for qtr in range(C.PARM_BGNQTR, C.PARM_ENDQTR + 1):
             if year == 2019 and qtr == 4:
@@ -30,15 +30,16 @@ def master_idx_to_csv(year):
             for record in masterindex:
                 if record.form not in C.PARM_FORMS:
                     continue
-                wr.writerow([
+                line = [
                     record.cik,
                     record.name,
                     record.form,
                     record.filingdate,
                     record.url,
-                    record.url,
                     edgar_filename(record, path, file_count)
-                ])
+                ]
+                assert len(line) == len(COLUMNS)
+                wr.writerow(line)
 
 
 def main():
