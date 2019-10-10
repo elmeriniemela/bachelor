@@ -48,3 +48,6 @@ os.makedirs(PARM_PATH, exist_ok=True)
 
 # EDGAR parameter
 PARM_EDGARPREFIX = 'https://www.sec.gov/Archives/'
+
+PERMNO_DB_NAME = "PERMNO.db"
+MAIN_DB_NAME = "MAIN.db"

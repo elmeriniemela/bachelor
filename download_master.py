@@ -1,10 +1,32 @@
 
-import constants as C
 import csv
+import pandas as pd
+import glob
+from sqlite3 import connect
+
+import constants as C
 from helpers import (
     download_masterindex,
     edgar_filename,
 )
+
+
+def master_to_db():
+    path = 'data/*MASTER.csv' # use your path
+    all_files = glob.glob(path)
+
+    li = []
+
+    for filename in all_files:
+        print(filename)
+        df = pd.read_csv(filename, index_col=None, header=0, sep=';')
+        df.cik = df.cik.apply(lambda x: str(int(x)).zfill(10))
+        li.append(df)
+
+    frame = pd.concat(li, axis=0, ignore_index=True)
+
+    with connect(C.MAIN_DB_NAME) as conn:
+        frame.to_sql(name='master', con=conn, if_exists='replace')
 
 
 def master_idx_to_csv(year):
