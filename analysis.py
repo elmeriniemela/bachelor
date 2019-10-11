@@ -108,7 +108,9 @@ def read_master(MAIN):
 
 def create_company_tables(MAIN, PERMNO):
     cur = MAIN.cursor()
-    cur.execute(SQL_PERMNO_INDEX)
+    print("Creating index for PERMNO to make future queries faster.")
+    cur.execute("CREATE INDEX IF NOT EXISTS permno_idx ON all_stocks(PERMNO)")
+    print("Query for unique PERMNO's")
     res = cur.execute("SELECT DISTINCT PERMNO from all_stocks").fetchall()
     perm_numbers = set(t[0] for t in res)
     print("Unique PERMNO's: ", len(perm_numbers))
@@ -122,15 +124,18 @@ def perm_number_table_exists(PERMNO, perm_no):
     return bool(res.fetchall())
 
 def create_based_on_permno(MAIN, PERMNO, perm_no):
+    cur = PERMNO.cursor()
+    cur.execute("CREATE INDEX IF NOT EXISTS date_idx ON `%s`(date)" % perm_no)
     if perm_number_table_exists(PERMNO, perm_no):
         print("Table exists ", perm_no)
         return 
     print("Create table for ", perm_no)
     df = pd.read_sql("select rowid, * from all_stocks where PERMNO='%s'" % perm_no, MAIN, index_col='rowid')
     df['date'] = pd.to_datetime(df['date'], format='%Y%m%d')
-
+    
     df = df.drop('PERMNO', axis=1)
     df.to_sql(name=perm_no, con=PERMNO, if_exists='fail')
+    
 
 
 def main():
