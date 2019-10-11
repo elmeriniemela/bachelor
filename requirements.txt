@@ -1,3 +1,4 @@
+wrds
 appdirs
 attrs
 beautifulsoup4

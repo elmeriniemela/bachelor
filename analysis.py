@@ -18,68 +18,15 @@ INNER JOIN ccm_lookup ON ccm_lookup.cik=master.cik WHERE ccm_lookup.lpermno IS N
 
 """
 
-
-SQL_ADD_MARKET_RETURNS = """
-
-"""
-
-SQL_create_all_stocks_primary_key = """
-CREATE TABLE all_stocks_primary_key("index" INTEGER PRIMARY KEY AUTOINCREMENT, "PERMNO" TEXT, "date" TEXT, "NAMEENDT" TEXT, "SHRCD" TEXT, "EXCHCD" TEXT, "SICCD" TEXT, "NCUSIP" TEXT, "TICKER" TEXT, "COMNAM" TEXT, "SHRCLS" TEXT, "TSYMBOL" TEXT, "NAICS" TEXT, "PRIMEXCH" TEXT, "TRDSTAT" TEXT, "SECSTAT" TEXT, "PERMCO" TEXT, "ISSUNO" TEXT, "HEXCD" TEXT, "HSICCD" TEXT, "CUSIP" TEXT, "DCLRDT" TEXT, "DLAMT" TEXT, "DLPDT" TEXT, "DLSTCD" TEXT, "NEXTDT" TEXT, "PAYDT" TEXT, "RCRDDT" TEXT, "SHRFLG" TEXT, "HSICMG" TEXT, "HSICIG" TEXT, "DISTCD" TEXT, "DIVAMT" TEXT, "FACPR" TEXT, "FACSHR" TEXT, "ACPERM" TEXT, "ACCOMP" TEXT, "NWPERM" TEXT, "DLRETX" TEXT, "DLPRC" TEXT, "DLRET" TEXT, "TRTSCD" TEXT, "NMSIND" TEXT, "MMCNT" TEXT, "NSDINX" TEXT, "BIDLO" TEXT, "ASKHI" TEXT, "PRC" TEXT, "VOL" TEXT, "RET" TEXT, "BID" TEXT, "ASK" TEXT, "SHROUT" TEXT, "CFACPR" TEXT, "CFACSHR" TEXT, "OPENPRC" TEXT, "NUMTRD" TEXT, "RETX" TEXT, "vwretd" TEXT, "vwretx" TEXT, "ewretd" TEXT, "ewretx" TEXT, "sprtrn" TEXT )
-INSERT INTO all_stocks_primary_key(PERMNO, date, NAMEENDT, SHRCD, EXCHCD, SICCD, NCUSIP, TICKER, COMNAM, SHRCLS, TSYMBOL, NAICS, PRIMEXCH, TRDSTAT, SECSTAT, PERMCO, ISSUNO, HEXCD, HSICCD, CUSIP, DCLRDT, DLAMT, DLPDT, DLSTCD, NEXTDT, PAYDT, RCRDDT, SHRFLG, HSICMG, HSICIG, DISTCD, DIVAMT, FACPR, FACSHR, ACPERM, ACCOMP, NWPERM, DLRETX, DLPRC, DLRET, TRTSCD, NMSIND, MMCNT, NSDINX, BIDLO, ASKHI, PRC, VOL, RET, BID, ASK, SHROUT, CFACPR, CFACSHR, OPENPRC, NUMTRD, RETX, vwretd, vwretx, ewretd, ewretx, sprtrn) SELECT * FROM all_stocks;
-
-"""
-
-SQL_INDEX = """
-
-CREATE INDEX filing_date_returns_idx 
-ON all_stocks_cleaned(PERMNO, date); 
+SQL_PERMNO_INDEX = """
 
 CREATE INDEX permno_idx 
 ON all_stocks(PERMNO); 
 
 """
 
-
-
-all_stock_columns = [
-    'index',
-    'date',
-    'PERMNO',
-    'PRC',
-    'VOL',
-    'SHROUT',
-    'ewretd',
-    'ewretx',
-]
-
-ALL_STOCS_QUERY = "SELECT %s FROM all_stocks_primary_key" % ', '.join('"{}"'.format(s) for s in all_stock_columns)
-
-SQL_CREATE_CLEANED = """
-
-CREATE TABLE IF NOT EXISTS "all_stocks_cleaned" (
-"index" INTEGER,
-  "date" TIMESTAMP,
-  "PERMNO" INTEGER,
-  "PRC" TEXT,
-  "VOL" TEXT,
-  "SHROUT" TEXT,
-  "ewretd" TEXT,
-  "ewretx" TEXT
-);
-CREATE INDEX "ix_all_stocks_cleaned_index"ON "all_stocks_cleaned" ("index");
-
-INSERT INTO all_stocks_cleaned(
-    'date', 
-    'PERMNO',
-    'PRC',
-    'VOL',
-    'SHROUT',
-    'ewretd',
-    'ewretx'
-) SELECT "date", "PERMNO", "PRC", "VOL", "SHROUT", "ewretd", "ewretx" FROM all_stocks_primary_key"""
-
 def edit_master(MAIN, PERMNO):
-    master = pd.read_sql(SQL_SELECT_JOIN_MASTER, MAIN, index_col='index').head(10)
+    master = pd.read_sql(SQL_SELECT_JOIN_MASTER, MAIN, index_col='index')
     master['lpermno'] = master['lpermno'].apply(lambda x: int(x))
     master['filingdate'] = pd.to_datetime(master['filingdate'], format='%Y%m%d')
 
@@ -161,6 +108,7 @@ def read_master(MAIN):
 
 def create_company_tables(MAIN, PERMNO):
     cur = MAIN.cursor()
+    cur.execute(SQL_PERMNO_INDEX)
     res = cur.execute("SELECT DISTINCT PERMNO from all_stocks").fetchall()
     perm_numbers = set(t[0] for t in res)
     print("Unique PERMNO's: ", len(perm_numbers))
@@ -187,7 +135,7 @@ def create_based_on_permno(MAIN, PERMNO, perm_no):
 
 def main():
     with connect(C.MAIN_DB_NAME) as MAIN, connect(C.PERMNO_DB_NAME) as PERMNO:
-        # create_company_tables(MAIN, PERMNO)
+        create_company_tables(MAIN, PERMNO)
         edit_master(MAIN, PERMNO)
 
 if __name__ == '__main__':

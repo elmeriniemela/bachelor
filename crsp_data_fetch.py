@@ -1,7 +1,7 @@
 from sqlite3 import connect
 import wrds
 
-DB_NAME = "bachelor.db"
+from constants import MAIN_DB_NAME as DB_NAME
 
 def cik_mapping(db):
     ccm_lookup = db.get_table(library='crspa', table='ccm_lookup')
