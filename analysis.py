@@ -82,12 +82,11 @@ def edit_master(MAIN, PERMNO):
     master = pd.read_sql(SQL_SELECT_JOIN_MASTER, MAIN, index_col='index').head(10)
     master['lpermno'] = master['lpermno'].apply(lambda x: int(x))
     master['filingdate'] = pd.to_datetime(master['filingdate'], format='%Y%m%d')
-    market_df = pd.read_sql("select rowid, DATE, ewretd from market_index", MAIN, index_col='rowid')
-    market_df['DATE'] = pd.to_datetime(market_df.DATE)
 
-
-    edited_master = master.apply(lambda row: apply_master(row, market_df, MAIN, PERMNO, len(master)), axis=1)
+    edited_master = master.apply(lambda row: apply_master(row, MAIN, PERMNO, len(master)), axis=1)
     joined = master.join(edited_master)
+    if len(joined.index) != len(master.index):
+        import pdb; pdb.set_trace()
     joined.to_sql(name='master_edited', con=MAIN, if_exists='replace')
 
 
@@ -104,7 +103,14 @@ def _master_fill_from_permno(data, master_row, PERMNO):
     if not perm_number_table_exists(PERMNO, permno):
         return
     df = pd.read_sql("select * from '%s'" % permno, PERMNO, index_col='rowid')
-    df['date'] = pd.to_datetime(df.date)
+    df['RET'] = pd.to_numeric(df['RET'], errors='coerce')
+    before = len(df.index)
+    df = df[df['RET'] > -0.66]
+    after = len(df.index)
+    if before != after:
+        print("Lines remaining %s/%s" % (after, before))
+        print(df)
+    df['date'] = pd.to_datetime(df['date'])
     df.sort_values(by=['date'])
     sub_df = df.loc[df['date'] == master_row['filingdate']]
 
@@ -129,7 +135,7 @@ def _master_fill_from_permno(data, master_row, PERMNO):
 
 
 
-def apply_master(master_row, market_df, MAIN, PERMNO, n_rows):
+def apply_master(master_row, MAIN, PERMNO, n_rows):
     print("Processing row %s/%s" % (master_row.name, n_rows))
 
     data = {
@@ -143,7 +149,6 @@ def apply_master(master_row, market_df, MAIN, PERMNO, n_rows):
     }
 
     _master_fill_from_permno(data, master_row, PERMNO)
-    # _master_fill_from_market(data, master_row, market_df)
 
     pprint(data)
 
