@@ -94,7 +94,7 @@ def extract_text(dest_path, raw_data):
 
     only_text, parse_res = get_text_lxml(only_text)
 
-    only_text = re.sub(r"<.*?>", "", only_text, re.DOTALL, re.S)
+    only_text = re.sub(r"<[\w\W]*?>", "", only_text, re.MULTILINE)
 
     # Remove non ascii chars
     only_text = ''.join(i if ord(i) < 128 else ' ' for i in only_text)
