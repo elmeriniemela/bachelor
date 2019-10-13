@@ -6,7 +6,6 @@ import os
 import zipfile
 import time
 import multiprocessing
-from selectolax.parser import HTMLParser
 from collections import defaultdict
 
 import constants as C
@@ -31,33 +30,33 @@ FILE_STATS = """\
 
 
 def parsed_file_path(zip_path, year):
-    file_path = os.path.join('parsed2', year, os.path.normpath(zip_path))
+    file_path = os.path.join('parsed', year, os.path.normpath(zip_path))
     os.makedirs(os.path.dirname(file_path), exist_ok=True)
     return file_path
 
 
-def get_text_selectolax(html):
-    tree = HTMLParser(html)
+def get_text_lxml(html):
+    tree = BeautifulSoup(html, 'lxml')
 
     res = defaultdict(int)
 
-    if tree.body is None:
+    if tree is None:
         return None
-
-    for tag in tree.css('script'):
-        res[tag.tag] += 1
+        
+    for tag in tree.find_all('script'):
+        res['script'] += 1
         tag.decompose()
-    for tag in tree.css('style'):
-        res[tag.tag] += 1
+    for tag in tree.find_all('style'):
+        res['style'] += 1
         tag.decompose()
 
-    for document in tree.css('document'):
-        res[document.tag] += 1
+    for document in tree.find_all('document'):
+        res['document'] += 1
         # Remove ASCII-Encoded segments – All document segment <TYPE> tags of GRAPHIC, ZIP, EXCEL, JSON, XML and PDF are deleted from the file.
-        doc_type = document.css('type')
+        doc_type = document.find('type')
         if not doc_type:
             continue
-        doc_type = doc_type[0].text()
+        doc_type = doc_type.text
         res[doc_type] += 1
         # Remove ASCII-Encoded segments – All document segment <TYPE> tags of GRAPHIC, ZIP, EXCEL, JSON, XML and PDF are deleted from the file.
         if doc_type in BAD_DOCUMENT_TYPES:
@@ -73,7 +72,7 @@ def get_text_selectolax(html):
             document.decompose()
             continue
 
-    return tree.body.text(separator=' '), dict(res)
+    return tree.get_text(separator=' '), dict(res)
 
 
 def extract_text(dest_path, raw_data):
@@ -93,7 +92,7 @@ def extract_text(dest_path, raw_data):
         header = headermatch.group()
         only_text = only_text.replace(header, '')
 
-    only_text, parse_res = get_text_selectolax(only_text)
+    only_text, parse_res = get_text_lxml(only_text)
 
     only_text = re.sub(r"<.*?>", "", only_text, re.DOTALL, re.S)
 
@@ -113,7 +112,7 @@ def extract_text(dest_path, raw_data):
             percent_kept=percent_kept,
         ))
         f.write(header)
-        f.write(only_text)
+        f.write('<DOCUMENT>\n' + only_text +'\n</DOCUMENT>')
 
 
 
@@ -163,7 +162,7 @@ def normal_process_que(que):
         try_clean(args)
 
 def multiprocess_que(que):
-    n_process = multiprocessing.cpu_count() * 2
+    n_process = multiprocessing.cpu_count()
     print("Using {} processes".format(n_process))
     p = multiprocessing.Pool(n_process)
     try:
