@@ -6,6 +6,8 @@ import os
 import zipfile
 import time
 import multiprocessing
+from selectolax.parser import HTMLParser
+from collections import defaultdict
 
 import constants as C
 from helpers import quittable
@@ -29,9 +31,49 @@ FILE_STATS = """\
 
 
 def parsed_file_path(zip_path, year):
-    file_path = os.path.join('parsed', year, os.path.normpath(zip_path))
+    file_path = os.path.join('parsed2', year, os.path.normpath(zip_path))
     os.makedirs(os.path.dirname(file_path), exist_ok=True)
     return file_path
+
+
+def get_text_selectolax(html):
+    tree = HTMLParser(html)
+
+    res = defaultdict(int)
+
+    if tree.body is None:
+        return None
+
+    for tag in tree.css('script'):
+        res[tag.tag] += 1
+        tag.decompose()
+    for tag in tree.css('style'):
+        res[tag.tag] += 1
+        tag.decompose()
+
+    for document in tree.css('document'):
+        res[document.tag] += 1
+        # Remove ASCII-Encoded segments – All document segment <TYPE> tags of GRAPHIC, ZIP, EXCEL, JSON, XML and PDF are deleted from the file.
+        doc_type = document.css('type')
+        if not doc_type:
+            continue
+        doc_type = doc_type[0].text()
+        res[doc_type] += 1
+        # Remove ASCII-Encoded segments – All document segment <TYPE> tags of GRAPHIC, ZIP, EXCEL, JSON, XML and PDF are deleted from the file.
+        if doc_type in BAD_DOCUMENT_TYPES:
+            document.decompose()
+            continue
+        
+        # Remove all exhibitions 
+        # For example, post–Sarbanes-Oxley, most 10-Ks contain Exhibit 31.1, 
+        # pertainingto the certification of the 10-K by the CEO. 
+        # The standard exhibit includes anumber of negative words, 
+        # for example,untrue,omit,weaknesses,andfraud.
+        if doc_type.startswith('EX-'):
+            document.decompose()
+            continue
+
+    return tree.body.text(separator=' '), dict(res)
 
 
 def extract_text(dest_path, raw_data):
@@ -41,6 +83,9 @@ def extract_text(dest_path, raw_data):
     # Remove all XBRL – all characters between <XBRL …> … </XBRL> are deleted.
     only_text = re.sub(r"<XBRL>.*?</XBRL>", "", only_text, re.DOTALL, re.S)
 
+    only_text = re.sub(r"-----BEGIN PRIVACY-ENHANCED MESSAGE-----", "", only_text)
+    only_text = re.sub(r"-----END PRIVACY-ENHANCED MESSAGE-----", "", only_text)
+
     headermatch =  RE_SEC_HEADER.search(only_text)
 
     header = ''
@@ -48,16 +93,7 @@ def extract_text(dest_path, raw_data):
         header = headermatch.group()
         only_text = only_text.replace(header, '')
 
-    soup = BeautifulSoup(only_text, 'lxml')
-    documents = soup.find_all('document')
-
-    for document in documents:
-        # Remove ASCII-Encoded segments – All document segment <TYPE> tags of GRAPHIC, ZIP, EXCEL, JSON, XML and PDF are deleted from the file.
-        doc_type = document.find('type')
-        if doc_type and doc_type.text in BAD_DOCUMENT_TYPES:
-            document.decompose()
-
-    only_text = soup.get_text(" ")
+    only_text, parse_res = get_text_selectolax(only_text)
 
     only_text = re.sub(r"<.*?>", "", only_text, re.DOTALL, re.S)
 
@@ -68,7 +104,7 @@ def extract_text(dest_path, raw_data):
     current_chars = len(only_text)
     percent_kept = (current_chars / original_chars) * 100
     process_index = multiprocessing.current_process().name
-    print("{:.2f} % ({}) {}".format(percent_kept, process_index, dest_path))
+    print("{:.2f} % ({}) {}    ----   {}".format(percent_kept, process_index, dest_path, parse_res))
 
     with open(dest_path, 'w') as f:
         f.write(FILE_STATS.format(
@@ -112,11 +148,23 @@ def main():
     start = time.time()
     print('\n' + time.strftime('%c') + '\nND_SRAF:  Program clean_data.py\n')
     print("Extracting text from {} zip files.".format(len(C.FILE_LIST)))
-    n_process = multiprocessing.cpu_count() * 2
-    print("Using {} processes".format(n_process))
 
     que = create_file_data_que()
     print("{} files in que.".format(len(que)))
+    multiprocess_que(que)
+
+    print('\nclean_data.py | Normal termination | ' +
+          time.strftime('%H:%M:%S', time.gmtime(time.time() - start)))
+    print(time.strftime('%c'))
+
+
+def normal_process_que(que):
+    for args in que:
+        try_clean(args)
+
+def multiprocess_que(que):
+    n_process = multiprocessing.cpu_count() * 2
+    print("Using {} processes".format(n_process))
     p = multiprocessing.Pool(n_process)
     try:
         p.map(try_clean, que)
@@ -129,11 +177,6 @@ def main():
         print("Quitting normally")
         p.close()
         p.join()
-
-    print('\nclean_data.py | Normal termination | ' +
-          time.strftime('%H:%M:%S', time.gmtime(time.time() - start)))
-    print(time.strftime('%c'))
-
 
 
 if __name__ == '__main__':

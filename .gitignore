@@ -10,3 +10,4 @@ data
 nltk_data
 original_files
 parsed
+*.swp
