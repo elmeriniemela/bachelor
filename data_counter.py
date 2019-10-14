@@ -7,7 +7,7 @@ import os
 
 import constants as C
 
-def zip_test()
+def zip_count()
     all_files = 0
 
     for fname in C.FILE_LIST:
