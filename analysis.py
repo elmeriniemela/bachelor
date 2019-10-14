@@ -4,6 +4,7 @@ from sqlite3 import connect
 import time
 import datetime
 from pprint import pprint
+import re
 
 import constants as C
 
@@ -31,17 +32,26 @@ def edit_master(MAIN, PERMNO):
     master['filingdate'] = pd.to_datetime(master['filingdate'], format='%Y%m%d')
 
     edited_master = master.apply(lambda row: apply_master(row, MAIN, PERMNO, len(master)), axis=1)
-    joined = master.join(edited_master)
+    joined = pd.concat([master, edited_master], axis=1)
     if len(joined.index) != len(master.index):
+        # Something wrong with the join
         import pdb; pdb.set_trace()
     joined.to_sql(name='master_edited', con=MAIN, if_exists='replace')
 
+def parse_files(MAIN):
+    from helpers import load_masterdictionary
+    master = pd.read_sql("select * from master_edited", MAIN, index_col='rowid')
+    lm_dictionary = load_masterdictionary()
 
-def edit_market(MAIN):
-    market = pd.read_sql("select rowid, * from market_index", MAIN, index_col='rowid')
-    market['DATE'] = pd.to_datetime(market['DATE'], format='%Y%m%d')
-    market.to_sql(name='market_index', con=MAIN, if_exists='replace')
 
+    edited_master = master.apply(lambda row: apply_master_file_data(row, lm_dictionary), axis=1)
+
+    joined = pd.concat([master, edited_master], axis=1)
+    
+    if len(joined.index) != len(master.index):
+        # Something wrong with the join
+        import pdb; pdb.set_trace()
+    joined.to_sql(name='master_parsed', con=MAIN, if_exists='replace')
 
 
 def _master_fill_from_permno(data, master_row, PERMNO):
@@ -135,13 +145,92 @@ def create_based_on_permno(MAIN, PERMNO, perm_no):
 
     df = df.drop('PERMNO', axis=1)
     df.to_sql(name=perm_no, con=PERMNO, if_exists='fail')
+
+
+def apply_master_file_data(master_row, lm_dictionary):
+    fname = row['fname']
+
+    data = get_file_data(path, lm_dictionary)
+
+    pprint(data)
+
+    return pd.Series(list(data.values()), index=list(data.keys()))
+
+
+def get_file_data(fname, lm_dictionary):
+    row = {
+        'file size': 0, # 1
+        'number of words': 0, # 2
+        '% positive': 0, # 3
+        '% negative': 0, # 4
+        '% uncertainty': 0, # 5
+        '% litigious': 0, # 6
+        '% modal-weak': 0, # 7
+        '% modal moderate', # 8
+        '% modal strong': 0, # 9
+        '% constraining': 0, # 10
+        '# of alphabetic': 0, # 11
+        '# of digits': 0, # 12
+        '# of numbers': 0, # 13
+        'avg # of syllables per word': 0, # 14
+        'average word length': 0, # 15
+        'vocabulary': 0, # 16
+    }
+
+    with open(fname, 'r', encoding='UTF-8', errors='ignore') as f_in:
+        doc = f_in.read()
+
+    doc_len = len(doc)
+    doc = re.sub('(May|MAY)', ' ', doc)  # drop all May month references
+    doc = doc.upper()  # for this parse caps aren't informative so shift
+
+    output_data['file size'] = doc_len
+
+    vdictionary = {}
+    total_syllables = 0
+    word_length = 0
+    
+    tokens = re.findall('\w+', doc)  # Note that \w+ splits hyphenated words
+    for token in tokens:
+        if not token.isdigit() and len(token) > 1 and token in lm_dictionary:
+            row['number of words'] += 1  # word count
+            word_length += len(token)
+            if token not in vdictionary:
+                vdictionary[token] = 1
+            if lm_dictionary[token].positive: row['% positive'] += 1
+            if lm_dictionary[token].negative: row['% negative'] += 1
+            if lm_dictionary[token].uncertainty: row['% uncertainty'] += 1
+            if lm_dictionary[token].litigious: row['% litigious'] += 1
+            if lm_dictionary[token].weak_modal: row['% modal-weak'] += 1
+            if lm_dictionary[token].moderate_modal: row['% modal moderate'] += 1
+            if lm_dictionary[token].strong_modal: row['% modal strong'] += 1
+            if lm_dictionary[token].constraining: row['% constraining'] += 1
+            total_syllables += lm_dictionary[token].syllables
+
+    row['# of alphabetic'] = len(re.findall('[A-Z]', doc))
+    row['# of digits'] = len(re.findall('[0-9]', doc))
+    # drop punctuation within numbers for number count
+    doc = re.sub('(?!=[0-9])(\.|,)(?=[0-9])', '', doc)
+    doc = doc.translate(str.maketrans(string.punctuation, " " * len(string.punctuation)))
+    row['# of numbers'] = len(re.findall(r'\b[-+\(]?[$€£]?[-+(]?\d+\)?\b', doc))
+    row['avg # of syllables per word'] = total_syllables / row['number of words']
+    row['average word length'] = word_length / row['number of words']
+    row['vocabulary'] = len(vdictionary)
+    
+    # Convert counts to %
+    for column_name in row:
+        if column_name.startswith('%'):
+            row[column_name] = (row[column_name] / row['number of words']) * 100
+        
+    return row
     
 
 
 def main():
     with connect(C.MAIN_DB_NAME) as MAIN, connect(C.PERMNO_DB_NAME) as PERMNO:
-        create_company_tables(MAIN, PERMNO)
-        edit_master(MAIN, PERMNO)
+        # create_company_tables(MAIN, PERMNO)
+        # edit_master(MAIN, PERMNO)
+        parse_files(MAIN)
 
 if __name__ == '__main__':
     main()
