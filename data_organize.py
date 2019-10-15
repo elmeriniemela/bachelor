@@ -180,11 +180,10 @@ def get_file_data(fname, lm_dictionary):
     with open(fname, 'r', encoding='UTF-8', errors='ignore') as f_in:
         doc = f_in.read()
 
-    doc_len = len(doc)
-    doc = re.sub('(May|MAY)', ' ', doc)  # drop all May month references
+    output_data['file size'] = len(doc)
     doc = doc.upper()  # for this parse caps aren't informative so shift
+    doc = re.sub(r'\sMAY\s', ' ', doc)  # drop all May month references
 
-    output_data['file size'] = doc_len
 
     vdictionary = {}
     total_syllables = 0
