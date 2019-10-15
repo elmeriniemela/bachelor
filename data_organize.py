@@ -5,6 +5,8 @@ import time
 import datetime
 from pprint import pprint
 import re
+import os
+import string
 
 import constants as C
 
@@ -40,8 +42,8 @@ def edit_master(MAIN, PERMNO):
 
 def parse_files(MAIN):
     from helpers import load_masterdictionary
-    master = pd.read_sql("select * from master_edited", MAIN, index_col='rowid')
-    lm_dictionary = load_masterdictionary()
+    master = pd.read_sql("select rowid, * from master_edited", MAIN, index_col='rowid')
+    lm_dictionary = load_masterdictionary(C.MASTER_DICT_PATH)
 
 
     edited_master = master.apply(lambda row: apply_master_file_data(row, lm_dictionary), axis=1)
@@ -148,8 +150,9 @@ def create_based_on_permno(MAIN, PERMNO, perm_no):
 
 
 def apply_master_file_data(master_row, lm_dictionary):
-    fname = row['fname']
-
+    fname = master_row['fname']
+    year = master_row['filingdate'][:4]
+    path = os.path.join('parsed', year, fname)
     data = get_file_data(path, lm_dictionary)
 
     pprint(data)
@@ -166,7 +169,7 @@ def get_file_data(fname, lm_dictionary):
         '% uncertainty': 0, # 5
         '% litigious': 0, # 6
         '% modal-weak': 0, # 7
-        '% modal moderate', # 8
+        '% modal moderate': 0, # 8
         '% modal strong': 0, # 9
         '% constraining': 0, # 10
         '# of alphabetic': 0, # 11
@@ -177,10 +180,14 @@ def get_file_data(fname, lm_dictionary):
         'vocabulary': 0, # 16
     }
 
+    if not os.path.isfile(fname):
+        print("File missing: ", fname)
+        return row
+
     with open(fname, 'r', encoding='UTF-8', errors='ignore') as f_in:
         doc = f_in.read()
 
-    output_data['file size'] = len(doc)
+    row['file size'] = len(doc)
     doc = doc.upper()  # for this parse caps aren't informative so shift
     doc = re.sub(r'\sMAY\s', ' ', doc)  # drop all May month references
 

@@ -10,4 +10,5 @@ data
 nltk_data
 original_files
 parsed
+parsed_exhibitions
 *.swp
