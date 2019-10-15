@@ -10,6 +10,9 @@ import string
 
 import constants as C
 
+RE_DOCUMENT = re.compile(r"<DOCUMENT>([\w\W]*?)</DOCUMENT>", re.MULTILINE)
+
+
 DT_FORMAT = '%Y-%m-%d %H:%M:%S'
 
 SQL_SELECT_JOIN_MASTER = """
@@ -190,7 +193,7 @@ def get_file_data(fname, lm_dictionary):
     row['file size'] = len(doc)
     doc = doc.upper()  # for this parse caps aren't informative so shift
     doc = re.sub(r'\sMAY\s', ' ', doc)  # drop all May month references
-
+    doc = RE_DOCUMENT.search(doc).group(1) # Drop SIC header and FILESTATS tags
 
     vdictionary = {}
     total_syllables = 0
