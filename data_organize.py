@@ -222,9 +222,11 @@ def get_file_data(fname, lm_dictionary):
     doc = re.sub('(?!=[0-9])(\.|,)(?=[0-9])', '', doc)
     doc = doc.translate(str.maketrans(string.punctuation, " " * len(string.punctuation)))
     row['# of numbers'] = len(re.findall(r'\b[-+\(]?[$€£]?[-+(]?\d+\)?\b', doc))
+    if not row['number of words']:
+        return row
+    row['vocabulary'] = len(vdictionary)
     row['avg # of syllables per word'] = total_syllables / row['number of words']
     row['average word length'] = word_length / row['number of words']
-    row['vocabulary'] = len(vdictionary)
     
     # Convert counts to %
     for column_name in row:
@@ -232,14 +234,54 @@ def get_file_data(fname, lm_dictionary):
             row[column_name] = (row[column_name] / row['number of words']) * 100
         
     return row
+
+def apply_book_value_and_ff_industry(master_row, book_value_df, sic_mapping):
+    data = get_book_value_data_and_ff_industry(master_row, book_value_df, sic_mapping)
+
+    pprint(data)
+
+    return pd.Series(list(data.values()), index=list(data.keys()))
+
+
+def get_book_value_data_and_ff_industry(master_row, book_value_df, sic_mapping):
+    data = {
+        'bkvlps': None,
+        'ff_industry': sic_mapping.get(master_row['SICCD'], None),
+    }
+    year = master_row['filingdate'][:4]
+    company_values = book_value_df.loc[book_value_df['gvkey'] == master_row['gvkey']].loc[book_value_df['fyear'] == year]
+    if len(company_values) == 0:
+        return data
+
+    row = company_values.iloc[0]
+    data['bkvlps'] = row['bkvlps']
+
+    return data
+
+
+def parse_book_value_and_ff_industry(MAIN):
+    master = pd.read_sql("select rowid, * from master_parsed", MAIN, index_col='rowid')
+    cur = MAIN.cursor()
+    res = cur.execute("SELECT SIC, FF_NUMBER FROM sic_mapping")
+    sic_mapping = {r[0]: r[1] for r in res.fetchall()}
+    book_value_df = pd.read_csv('book_value.csv', index_col=None, header=0, sep=',', dtype=str)
+
+    edited_master = master.apply(lambda row: apply_book_value_and_ff_industry(row, book_value_df, sic_mapping), axis=1)
+
+    joined = pd.concat([master, edited_master], axis=1)
     
+    if len(joined.index) != len(master.index):
+        # Something wrong with the join
+        import pdb; pdb.set_trace()
+    joined.to_sql(name='master_book', con=MAIN, if_exists='replace')
 
 
 def main():
     with connect(C.MAIN_DB_NAME) as MAIN, connect(C.PERMNO_DB_NAME) as PERMNO:
         # create_company_tables(MAIN, PERMNO)
         # edit_master(MAIN, PERMNO)
-        parse_files(MAIN)
+        # parse_files(MAIN)
+        parse_book_value_and_ff_industry(MAIN)
 
 if __name__ == '__main__':
     main()
