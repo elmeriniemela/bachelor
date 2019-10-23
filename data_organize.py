@@ -73,7 +73,7 @@ def _master_fill_from_permno(data, master_row, PERMNO):
         print("Lines remaining %s/%s" % (after, before))
         print(df)
     df['date'] = pd.to_datetime(df['date'])
-    df.sort_values(by=['date'])
+    df.sort_values(by=['date'], inplace=True)
     sub_df = df.loc[df['date'] == master_row['filingdate']]
 
     if len(sub_df) == 0:
@@ -258,9 +258,11 @@ def get_book_value_data_and_ff_industry(master_row, book_value_df, sic_mapping):
 
     return data
 
+    
+
 
 def parse_book_value_and_ff_industry(MAIN):
-    master = pd.read_sql("select rowid, * from master_parsed", MAIN, index_col='rowid')
+    master = pd.read_sql("select * from master_parsed", MAIN, index_col='rowid')
     cur = MAIN.cursor()
     res = cur.execute("SELECT SIC, FF_NUMBER FROM sic_mapping")
     sic_mapping = {r[0]: r[1] for r in res.fetchall()}
@@ -276,12 +278,66 @@ def parse_book_value_and_ff_industry(MAIN):
     joined.to_sql(name='master_book', con=MAIN, if_exists='replace')
 
 
+
+
+def get_industry_retuns(master_row, industry_df):
+    data = {
+        'median_industry_returns': None,
+    }
+    if not master_row['ff_industry']:
+        return data
+
+    sub_df = industry_df.loc[industry_df['Date'] == master_row['filingdate']]
+
+    if len(sub_df) == 0:
+        return 
+
+    row = sub_df.iloc[0]
+    idx = industry_df.index.get_loc(row.name)
+
+    filing_returns_period = industry_df.iloc[idx:idx+4]
+
+    data['median_industry_returns'] = filing_returns_period[master_row['ff_industry']].median(axis=0)
+
+    return data
+
+
+
+
+def apply_industry_returns(master_row, industry_df):
+    data = get_industry_retuns(master_row, industry_df)
+
+    pprint(data)
+
+    return pd.Series(list(data.values()), index=list(data.keys()))
+
+
+
+
+def add_industry_returns(MAIN):
+    industry_df = pd.read_csv('industry_numbered_columns.csv', index_col=None, header=0, sep=',', dtype=str)
+    industry_df['Date'] = pd.to_datetime(industry_df['Date'], format='%Y%m%d')
+    industry_df.sort_values(by=['Date'], inplace=True)
+
+
+    master = pd.read_sql("select * from master_book", MAIN, index_col='rowid')
+
+    edited_master = master.apply(lambda row: apply_industry_returns(row, industry_df), axis=1)
+
+    joined = pd.concat([master, edited_master], axis=1)
+    
+    if len(joined.index) != len(master.index):
+        # Something wrong with the join
+        import pdb; pdb.set_trace()
+    joined.to_sql(name='master_edited', con=MAIN, if_exists='replace')
+
 def main():
     with connect(C.MAIN_DB_NAME) as MAIN, connect(C.PERMNO_DB_NAME) as PERMNO:
         # create_company_tables(MAIN, PERMNO)
         # edit_master(MAIN, PERMNO)
         # parse_files(MAIN)
-        parse_book_value_and_ff_industry(MAIN)
+        # parse_book_value_and_ff_industry(MAIN)
+        add_industry_returns(MAIN)
 
 if __name__ == '__main__':
     main()
