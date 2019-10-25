@@ -1,4 +1,6 @@
 import pandas as pd
+import numpy as np
+
 import glob
 from sqlite3 import connect
 import time
@@ -331,13 +333,79 @@ def add_industry_returns(MAIN):
         import pdb; pdb.set_trace()
     joined.to_sql(name='master_edited', con=MAIN, if_exists='replace')
 
+
+
+def add_turnover(MAIN, PERMNO):
+    master = pd.read_sql("select * from master_edited", MAIN, index_col='rowid')
+
+    edited_master = master.apply(lambda row: apply_turnover(row, PERMNO), axis=1)
+
+    joined = pd.concat([master, edited_master], axis=1)
+    
+    if len(joined.index) != len(master.index):
+        # Something wrong with the join
+        import pdb; pdb.set_trace()
+    joined.to_sql(name='master_edited', con=MAIN, if_exists='replace')
+
+
+
+def apply_turnover(master_row, PERMNO):
+    data = get_turnover_data(master_row, PERMNO)
+
+    pprint(data)
+
+    return pd.Series(list(data.values()), index=list(data.keys()))
+
+
+def get_turnover_data(master_row, PERMNO):
+    data = {
+        'turnover': None
+    }
+    permno = master_row['lpermno']
+
+    if not perm_number_table_exists(PERMNO, permno):
+        return data
+    df = pd.read_sql("select * from '%s'" % permno, PERMNO, index_col='rowid')
+    df['VOL'] = pd.to_numeric(df['VOL'], errors='coerce')
+    before = len(df.index)
+    df = df[np.isfinite(df['VOL'])]
+    after = len(df.index)
+    if before != after:
+        print("Lines remaining %s/%s" % (after, before))
+    df['date'] = pd.to_datetime(df['date'])
+    df.sort_values(by=['date'], inplace=True)
+    sub_df = df.loc[df['date'] == master_row['filingdate']]
+
+    if len(sub_df) == 0:
+        return data
+
+    row = sub_df.iloc[0]
+    idx = df.index.get_loc(row.name)
+
+    history = df.iloc[idx - 252 : idx -6]
+    SHROUT = df.iloc[idx]['SHROUT']
+
+    if len(history) < 60 or not SHROUT:
+        return data
+
+    # The volume of shares traded in days [−252,−6] prior to thefile date divided by shares outstanding on the file date. 
+    # Atleast 60 observations of daily volume must be available to be included in the sample.
+    data['turnover'] = history['VOL'].sum(axis=0) / float(SHROUT)
+
+    return data
+
+
+
+
+
 def main():
     with connect(C.MAIN_DB_NAME) as MAIN, connect(C.PERMNO_DB_NAME) as PERMNO:
         # create_company_tables(MAIN, PERMNO)
         # edit_master(MAIN, PERMNO)
         # parse_files(MAIN)
         # parse_book_value_and_ff_industry(MAIN)
-        add_industry_returns(MAIN)
+        # add_industry_returns(MAIN)
+        add_turnover(MAIN, PERMNO)
 
 if __name__ == '__main__':
     main()
