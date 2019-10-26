@@ -59,7 +59,8 @@ def do_analysis(MAIN):
     master['book_to_market'] = winsorize(master['book_to_market'], limits=(0.01, 0.01))
     # master['%_negative'] = winsorize(master['%_negative'], limits=(0.01, 0.01))
     # master['median_filing_period_returns'] = winsorize(master['median_filing_period_returns'], limits=(0.01, 0.01))
-
+    # master['turnover'] = winsorize(master['turnover'], limits=(0.01, 0.01))
+    # master['size'] = winsorize(master['size'], limits=(0.01, 0.01))
 
     # Use log values for regression
     master['log_size'] = np.log(master['size'])
@@ -76,6 +77,8 @@ def do_analysis(MAIN):
     profiling_vars = predictor_vars + [outcome_var, 'median_filing_period_value_weighted_returns', 'size', 'book_to_market', 'turnover']
 
     do_profiling(master, profiling_vars)
+
+    # Binary values don't work in profiling, so add them after
     predictor_vars.extend(ff_categories)
     
     X = master[predictor_vars]
