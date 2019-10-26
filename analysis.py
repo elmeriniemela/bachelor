@@ -75,7 +75,7 @@ def do_analysis(MAIN):
     predictor_vars = ['%_negative', 'log_size', 'log_turnover', 'log_book_to_market']
     profiling_vars = predictor_vars + [outcome_var, 'median_filing_period_value_weighted_returns', 'size', 'book_to_market', 'turnover']
 
-    # do_profiling(master, profiling_vars)
+    do_profiling(master, profiling_vars)
     predictor_vars.extend(ff_categories)
     
     X = master[predictor_vars]
