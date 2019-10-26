@@ -9,12 +9,22 @@ import matplotlib.pyplot as plt
 from scipy.stats.mstats import winsorize
 import pandas_profiling
 
+def do_profiling(master, profiling_vars):
+    print("Creating profiling...")
+    summary_df = master[profiling_vars]
+    profile = summary_df.profile_report(title='Data Profiling Report')
+    profile.to_file(output_file="profile.html")
+
+
 def do_analysis(MAIN):
     master = pd.read_sql("select * from master_edited", MAIN, index_col='rowid')
 
     # Calculate base values and cast types
     master['bkvlps'] = master['bkvlps'].astype(float)
+
+    # Price per share * shares outstanding
     master['size'] = master.price_minus_one_day * master.shares_outstanding
+    #  Book Value Per Share / Price per share
     master['book_to_market'] = master.bkvlps / master.price_minus_one_day
 
     # Book-to-market COMPUSTAT data available and book value>0
@@ -42,23 +52,14 @@ def do_analysis(MAIN):
     # Create 48 - 1 FF industry dummies
     master = pd.concat([master, pd.get_dummies(master['ff_industry'], drop_first=True)], axis=1)
 
-
     ff_categories = [str(n) for n in range(2, 49)]
 
     outcome_var = 'median_RET'
     predictor_vars = ['% negative', 'log_size', 'log_turnover', 'log_book_to_market']
     profiling_vars = [var for var in predictor_vars] + [outcome_var]
 
-
-    predictor_vars.extend(ff_categories)
-
-
-
-    summary_df = master[profiling_vars]
-    profile = summary_df.profile_report(title='Data Profiling Report')
-    profile.to_file(output_file="profile.html")
-
-
+    # do_profiling(master, profiling_vars)
+    # predictor_vars.extend(ff_categories)
     
     X = master[predictor_vars]
     y = master[outcome_var]
