@@ -19,6 +19,7 @@ def do_profiling(master, profiling_vars):
 def do_analysis(MAIN):
     master = pd.read_sql("select * from master_edited", MAIN, index_col='rowid')
 
+    # Mapping for renaming the colums for profiling
     useful_columns = {
         'price_minus_one_day': 'price_minus_one_day', 
         'volume': 'volume',
@@ -32,17 +33,22 @@ def do_analysis(MAIN):
         'turnover': 'turnover',
     }
 
+    # Select only specific columns
     master = master[useful_columns.keys()]
+
+    # Rename based on mapping
     master.columns = useful_columns.values()
 
 
     # Calculate base values and cast types
     master['book_value_per_share'] = master['book_value_per_share'].astype(float)
-
     # Price per share * shares outstanding
     master['size'] = master.price_minus_one_day * master.shares_outstanding
     #  Book Value Per Share / Price per share
     master['book_to_market'] = master.book_value_per_share / master.price_minus_one_day
+
+
+    # FILTERING
 
     # Book-to-market COMPUSTAT data available and book value>0
     master = master[master['book_to_market'] > 0]
@@ -55,12 +61,18 @@ def do_analysis(MAIN):
     master.replace([np.inf, -np.inf], np.nan, inplace=True)
     master = master.dropna(how='any')
 
+
+    # WINSORIZE
+
     # we winsorize the book-to-market variable at the 1% level.
     master['book_to_market'] = winsorize(master['book_to_market'], limits=(0.01, 0.01))
     # master['%_negative'] = winsorize(master['%_negative'], limits=(0.01, 0.01))
     # master['median_filing_period_returns'] = winsorize(master['median_filing_period_returns'], limits=(0.01, 0.01))
     # master['turnover'] = winsorize(master['turnover'], limits=(0.01, 0.01))
     # master['size'] = winsorize(master['size'], limits=(0.01, 0.01))
+
+
+    # LOG
 
     # Use log values for regression
     master['log_size'] = np.log(master['size'])
@@ -76,7 +88,7 @@ def do_analysis(MAIN):
     predictor_vars = ['%_negative', 'log_size', 'log_turnover', 'log_book_to_market']
     profiling_vars = predictor_vars + [outcome_var, 'median_filing_period_value_weighted_returns', 'size', 'book_to_market', 'turnover']
 
-    do_profiling(master, profiling_vars)
+    # do_profiling(master, profiling_vars)
 
     # Binary values don't work in profiling, so add them after
     predictor_vars.extend(ff_categories)
