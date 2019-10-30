@@ -7,7 +7,6 @@ https://wrds-web.wharton.upenn.edu/wrds/query_forms/variable_documentation.cfm?v
 * Outliers in turnover, size, median_filing_period_returns, %_negative
 
 
-
                                  OLS Regression Results                                 
 ========================================================================================
 Dep. Variable:     median_filing_period_returns   R-squared:                       0.005
@@ -83,8 +82,18 @@ Kurtosis:                      48.391   Cond. No.                     2.12e+03
 
 Warnings:
 [1] Standard Errors assume that the covariance matrix of the errors is correctly specified.
+* Include robust standard errors.
+* Do i need cross ectional Fama mac beth regressions
 [2] The condition number is large, 2.12e+03. This might indicate that there are
 strong multicollinearity or other numerical problems.
+* No need to worry
+
+start with introduction 5 pages
+* motivation
+* results
+* litarature overview
+* Writing tips for phd students
+
 
 
 Questions:
@@ -97,7 +106,7 @@ Questions:
     * "Fama-French (1997) industry dummies (based on 48 industries) and a constant are also included in each regression."
     * This implies several regressions, but i did only one regression with multiple variables?
 
-
+* Should i try my luck with R?
 
 
 Econometrics notes:
