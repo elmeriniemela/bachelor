@@ -91,10 +91,14 @@ def get_data_dict(master_row, book_value_df, sic_mapping, lm_dictionary, MAIN, P
         'average_word_length': 0, # 15
         'vocabulary': 0, # 16
     }
-    fname_path = os.path.join('parsed', str(financial_data['year']), master_row['fname'])
-    textual_columns_count = len(textual_data.keys())
-    _fill_textual_data(textual_data, fname_path, master_row, lm_dictionary)
-    assert len(textual_data.keys()) == textual_columns_count
+
+    if financial_data['median_filing_period_returns'] is not None:
+        fname_path = os.path.join('parsed', str(financial_data['year']), master_row['fname'])
+        textual_columns_count = len(textual_data.keys())
+        _fill_textual_data(textual_data, fname_path, master_row, lm_dictionary)
+        assert len(textual_data.keys()) == textual_columns_count
+    else:
+        print("Skipped file parseing since financial data is missing")
 
     data = {}
     data.update(financial_data)
@@ -173,7 +177,6 @@ def _fill_financial_data(data, master_row, book_value_df, sic_mapping, MAIN, PER
     after = len(df.index)
     if before != after:
         print("Lines remaining %s/%s" % (after, before))
-        print(df)
     df['date'] = pd.to_datetime(df['date'])
     df.sort_values(by=['date'], inplace=True)
     sub_df = df.loc[df['date'] == master_row['filingdate']]
@@ -206,7 +209,6 @@ def _fill_financial_data(data, master_row, book_value_df, sic_mapping, MAIN, PER
     else:
         data['turnover'] = history['VOL'].sum(axis=0) / float(FILING_DATE_SHROUT)
 
-    import pdb; pdb.set_trace()
     # Book-to-market COMPUSTAT data available
     company_values = book_value_df.loc[book_value_df['gvkey'] == master_row['gvkey']].loc[book_value_df['fyear'] == str(data['year'])]
     if len(company_values) == 0:

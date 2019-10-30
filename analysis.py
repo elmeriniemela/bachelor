@@ -17,7 +17,7 @@ def do_profiling(master, profiling_vars):
 
 
 def do_analysis(MAIN):
-    master = pd.read_sql("select * from master_edited", MAIN, index_col='rowid')
+    master = pd.read_sql("select * from master_edited", MAIN, index_col='index')
     import pdb; pdb.set_trace()
 
     # Mapping for renaming the colums for profiling
