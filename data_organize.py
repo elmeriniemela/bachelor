@@ -15,21 +15,20 @@ import constants as C
 
 RE_DOCUMENT = re.compile(r"<DOCUMENT>([\w\W]*?)</DOCUMENT>", re.MULTILINE)
 
-
-SQL_SELECT_JOIN_MASTER = """
-
-SELECT master.`index`, master.cik, ccm_lookup.lpermno, ccm_lookup.gvkey, master.name, master.form, master.filingdate, master.url, master.fname
-FROM master
-INNER JOIN ccm_lookup ON ccm_lookup.cik=master.cik;
-
-"""
-
 def edit_master(MAIN, PERMNO):
-    master = pd.read_sql(SQL_SELECT_JOIN_MASTER, MAIN, index_col='index')
-    
-    master['lpermno'] = master['lpermno'].astype('Int32')
+    master = pd.read_sql("select * from master", MAIN, index_col='index')
+    assert len(master) == 114186
+
     master['filingdate'] = pd.to_datetime(master['filingdate'], format='%Y%m%d')
-    
+    ccm_lookup = pd.read_sql(
+        "select `index`, lpermno, lpermco, gvkey, cik, year1, year2 from ccm_lookup where lpermno is not null",
+        MAIN, index_col='index'
+    )
+    ccm_lookup['year1'] = ccm_lookup['year1'].astype(int)
+    ccm_lookup['year2'] = ccm_lookup['year2'].astype(int)
+    ccm_lookup['lpermno'] = ccm_lookup['lpermno'].astype(int)
+    ccm_lookup['lpermco'] = ccm_lookup['lpermco'].astype(int)
+
     lm_dictionary = load_masterdictionary(C.MASTER_DICT_PATH)
 
     book_value_df = pd.read_csv('book_value.csv', index_col=None, header=0, sep=',', dtype=str)
@@ -38,7 +37,16 @@ def edit_master(MAIN, PERMNO):
     res = cur.execute("SELECT SIC, FF_NUMBER FROM sic_mapping")
     sic_mapping = {r[0]: r[1] for r in res.fetchall()}
 
-    edited_master = master.apply(lambda master_row: apply_dict(get_data_dict, master_row, book_value_df, sic_mapping, lm_dictionary, MAIN, PERMNO), axis=1)
+    callback_args = (
+        book_value_df,
+        sic_mapping,
+        lm_dictionary,
+        ccm_lookup,
+        MAIN,
+        PERMNO,
+    )
+
+    edited_master = master.apply(lambda master_row: apply_dict(get_data_dict, master_row, *callback_args), axis=1)
 
     joined = pd.concat([master, edited_master], axis=1)
     if len(joined.index) != len(master.index):
@@ -56,8 +64,15 @@ def apply_dict(callback, *args, **kwargs):
     return pd.Series(list(data.values()), index=list(data.keys()))
 
 
-def get_data_dict(master_row, book_value_df, sic_mapping, lm_dictionary, MAIN, PERMNO):
+def get_data_dict(master_row, book_value_df, sic_mapping, lm_dictionary, ccm_lookup, MAIN, PERMNO):
     financial_data = {
+        'gvkey': None,
+        'gvkey_unique': None,
+        'lpermno': None,
+        'lpermno_unique': None,
+        'lpermco': None,
+        'lpermco_unique': None,
+        'returns_missing_filtered': None,
         'price_minus_one_day': None, 
         'volume_minus_one_day': None,
         'shares_outstanding_minus_one_day': None,
@@ -70,7 +85,7 @@ def get_data_dict(master_row, book_value_df, sic_mapping, lm_dictionary, MAIN, P
         'year': int(master_row['fname'][5:9]),
     }
     financial_columns_count = len(financial_data.keys())
-    _fill_financial_data(financial_data, master_row, book_value_df, sic_mapping, MAIN, PERMNO)
+    _fill_financial_data(financial_data, master_row, book_value_df, sic_mapping, ccm_lookup, MAIN, PERMNO)
     assert len(financial_data.keys()) == financial_columns_count
 
     textual_data = {
@@ -160,8 +175,24 @@ def _fill_textual_data(row, fname, master_row, lm_dictionary):
     return
 
 
-def _fill_financial_data(data, master_row, book_value_df, sic_mapping, MAIN, PERMNO):
-    permno = master_row['lpermno']
+def _fill_financial_data(data, master_row, book_value_df, sic_mapping, ccm_lookup, MAIN, PERMNO):
+    permno_match = ccm_lookup[
+        (ccm_lookup['year1'] <= data['year']) 
+        & (ccm_lookup['year2'] >= data['year']) 
+        & (ccm_lookup['cik'] == master_row['cik'])
+    ]
+    if permno_match.empty:
+        # No permno match
+        return
+
+    data['gvkey'] = permno_match['gvkey'].value_counts().idxmax()
+    data['gvkey_unique'] = len(permno_match['gvkey'].unique())
+
+    data['lpermno'] = permno = permno_match['lpermno'].value_counts().idxmax()
+    data['lpermno_unique'] = len(permno_match['lpermno'].unique())
+
+    data['lpermco'] = permno_match['lpermco'].value_counts().idxmax()
+    data['lpermco_unique'] = len(permno_match['lpermco'].unique())
 
     if not permno or not perm_number_table_exists(PERMNO, permno):
         # No stock data at all
@@ -175,13 +206,12 @@ def _fill_financial_data(data, master_row, book_value_df, sic_mapping, MAIN, PER
     df = df[df['RET'] > -0.66]
     df = df[np.isfinite(df['VOL'])]
     after = len(df.index)
-    if before != after:
-        print("Lines remaining %s/%s" % (after, before))
+    data['returns_missing_filtered'] = before - after
     df['date'] = pd.to_datetime(df['date'])
     df.sort_values(by=['date'], inplace=True)
     sub_df = df.loc[df['date'] == master_row['filingdate']]
 
-    if len(sub_df) == 0:
+    if sub_df.empty:
         # No stock data on filing date
         return 
 
@@ -210,8 +240,8 @@ def _fill_financial_data(data, master_row, book_value_df, sic_mapping, MAIN, PER
         data['turnover'] = history['VOL'].sum(axis=0) / float(FILING_DATE_SHROUT)
 
     # Book-to-market COMPUSTAT data available
-    company_values = book_value_df.loc[book_value_df['gvkey'] == master_row['gvkey']].loc[book_value_df['fyear'] == str(data['year'])]
-    if len(company_values) == 0:
+    company_values = book_value_df.loc[book_value_df['gvkey'] == data['gvkey']].loc[book_value_df['fyear'] == str(data['year'])]
+    if company_values.empty:
         return
 
     row = company_values.iloc[0]
