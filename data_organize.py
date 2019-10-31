@@ -112,8 +112,6 @@ def get_data_dict(master_row, book_value_df, sic_mapping, lm_dictionary, ccm_loo
         textual_columns_count = len(textual_data.keys())
         _fill_textual_data(textual_data, fname_path, master_row, lm_dictionary)
         assert len(textual_data.keys()) == textual_columns_count
-    else:
-        print("Skipped file parseing since financial data is missing")
 
     data = {}
     data.update(financial_data)
@@ -123,7 +121,6 @@ def get_data_dict(master_row, book_value_df, sic_mapping, lm_dictionary, ccm_loo
 
 def _fill_textual_data(row, fname, master_row, lm_dictionary):
     if not os.path.isfile(fname):
-        print("File missing: ", fname)
         return
 
     with open(fname, 'r', encoding='UTF-8', errors='ignore') as f_in:

@@ -18,33 +18,29 @@ def do_profiling(master, profiling_vars):
 
 def do_analysis(MAIN):
     master = pd.read_sql("select * from master_edited", MAIN, index_col='index')
-    import pdb; pdb.set_trace()
 
     # Mapping for renaming the colums for profiling
-    useful_columns = {
-        'price_minus_one_day': 'price_minus_one_day', 
-        'volume': 'volume',
-        'shares_outstanding': 'shares_outstanding',
-        'median_RET': 'median_filing_period_returns', 
-        'median_vwretd': 'median_filing_period_value_weighted_returns',
-        'number of words': 'number_of_words', 
-        '% negative': '%_negative',
-        'bkvlps': 'book_value_per_share',
-        'ff_industry': 'ff_industry',
-        'turnover': 'turnover',
-    }
+    useful_columns = [
+        'price_minus_one_day',
+        'volume_minus_one_day',
+        'shares_outstanding_minus_one_day',
+        'median_filing_period_returns', 
+        'median_filing_period_value_weighted_returns',
+        'number_of_words', 
+        'percent_negative',
+        'book_value_per_share',
+        'ff_industry',
+        'turnover',
+    ]
 
     # Select only specific columns
-    master = master[useful_columns.keys()]
-
-    # Rename based on mapping
-    master.columns = useful_columns.values()
+    master = master[useful_columns]
 
 
     # Calculate base values and cast types
     master['book_value_per_share'] = master['book_value_per_share'].astype(float)
     # Price per share * shares outstanding
-    master['size'] = master.price_minus_one_day * master.shares_outstanding
+    master['size'] = master.price_minus_one_day * master.shares_outstanding_minus_one_day
     #  Book Value Per Share / Price per share
     master['book_to_market'] = master.book_value_per_share / master.price_minus_one_day
 
@@ -67,7 +63,7 @@ def do_analysis(MAIN):
 
     # we winsorize the book-to-market variable at the 1% level.
     master['book_to_market'] = winsorize(master['book_to_market'], limits=(0.01, 0.01))
-    # master['%_negative'] = winsorize(master['%_negative'], limits=(0.01, 0.01))
+    # master['percent_negative'] = winsorize(master['percent_negative'], limits=(0.01, 0.01))
     # master['median_filing_period_returns'] = winsorize(master['median_filing_period_returns'], limits=(0.01, 0.01))
     # master['turnover'] = winsorize(master['turnover'], limits=(0.01, 0.01))
     # master['size'] = winsorize(master['size'], limits=(0.01, 0.01))
@@ -86,7 +82,7 @@ def do_analysis(MAIN):
     ff_categories = [str(n) for n in range(2, 49)]
 
     outcome_var = 'median_filing_period_returns'
-    predictor_vars = ['%_negative', 'log_size', 'log_turnover', 'log_book_to_market']
+    predictor_vars = ['percent_negative', 'log_size', 'log_turnover', 'log_book_to_market']
     profiling_vars = predictor_vars + [outcome_var, 'median_filing_period_value_weighted_returns', 'size', 'book_to_market', 'turnover']
 
     # do_profiling(master, profiling_vars)
