@@ -20,14 +20,16 @@ def edit_master(MAIN, PERMNO):
     assert len(master) == 114186
 
     master['filingdate'] = pd.to_datetime(master['filingdate'], format='%Y%m%d')
-    ccm_lookup = pd.read_sql(
-        "select `index`, lpermno, lpermco, gvkey, cik, year1, year2 from ccm_lookup where lpermno is not null",
-        MAIN, index_col='index'
-    )
-    ccm_lookup['year1'] = ccm_lookup['year1'].astype(int)
-    ccm_lookup['year2'] = ccm_lookup['year2'].astype(int)
-    ccm_lookup['lpermno'] = ccm_lookup['lpermno'].astype(int)
-    ccm_lookup['lpermco'] = ccm_lookup['lpermco'].astype(int)
+
+    ccmlinktable = pd.read_csv('ccmlinktable.csv', index_col=None, header=0, sep=',', dtype=str)
+    ccmlinktable['LINKDT'] = pd.to_datetime(ccmlinktable['LINKDT'], format='%Y%m%d')
+    ccmlinktable.LINKENDDT = ccmlinktable.LINKENDDT.replace({"E": "20500101"})
+    ccmlinktable['LINKENDDT'] = pd.to_datetime(ccmlinktable['LINKENDDT'], format='%Y%m%d')
+    ccmlinktable['LPERMNO'] = ccmlinktable['LPERMNO'].fillna(0).astype(int)
+    ccmlinktable['LPERMCO'] = ccmlinktable['LPERMCO'].fillna(0).astype(int)
+
+    # Remove links that have expired before 2008 for performance
+    ccmlinktable[(ccmlinktable['LINKENDDT'] > '2007-12-01 00:00:00')]
 
     lm_dictionary = load_masterdictionary(C.MASTER_DICT_PATH)
 
@@ -41,7 +43,7 @@ def edit_master(MAIN, PERMNO):
         book_value_df,
         sic_mapping,
         lm_dictionary,
-        ccm_lookup,
+        ccmlinktable,
         MAIN,
         PERMNO,
     )
@@ -64,14 +66,15 @@ def apply_dict(callback, *args, **kwargs):
     return pd.Series(list(data.values()), index=list(data.keys()))
 
 
-def get_data_dict(master_row, book_value_df, sic_mapping, lm_dictionary, ccm_lookup, MAIN, PERMNO):
+def get_data_dict(master_row, book_value_df, sic_mapping, lm_dictionary, ccmlinktable, MAIN, PERMNO):
     financial_data = {
         'gvkey': None,
         'gvkey_unique': None,
-        'lpermno': None,
-        'lpermno_unique': None,
-        'lpermco': None,
-        'lpermco_unique': None,
+        'LPERMNO': None,
+        'LPERMNO_unique': None,
+        'LPERMCO': None,
+        'LPERMCO_unique': None,
+        'ccmlinktable_com_names': None,
         'returns_missing_filtered': None,
         'price_minus_one_day': None, 
         'volume_minus_one_day': None,
@@ -85,7 +88,7 @@ def get_data_dict(master_row, book_value_df, sic_mapping, lm_dictionary, ccm_loo
         'year': int(master_row['fname'][5:9]),
     }
     financial_columns_count = len(financial_data.keys())
-    _fill_financial_data(financial_data, master_row, book_value_df, sic_mapping, ccm_lookup, MAIN, PERMNO)
+    _fill_financial_data(financial_data, master_row, book_value_df, sic_mapping, ccmlinktable, MAIN, PERMNO)
     assert len(financial_data.keys()) == financial_columns_count
 
     textual_data = {
@@ -172,11 +175,11 @@ def _fill_textual_data(row, fname, master_row, lm_dictionary):
     return
 
 
-def _fill_financial_data(data, master_row, book_value_df, sic_mapping, ccm_lookup, MAIN, PERMNO):
-    permno_match = ccm_lookup[
-        (ccm_lookup['year1'] <= data['year']) 
-        & (ccm_lookup['year2'] >= data['year']) 
-        & (ccm_lookup['cik'] == master_row['cik'])
+def _fill_financial_data(data, master_row, book_value_df, sic_mapping, ccmlinktable, MAIN, PERMNO):
+    permno_match = ccmlinktable[
+        (ccmlinktable['LINKDT'] <= master_row['filingdate']) 
+        & (ccmlinktable['LINKENDDT'] >= master_row['filingdate']) 
+        & (ccmlinktable['cik'] == master_row['cik'])
     ]
     if permno_match.empty:
         # No permno match
@@ -185,11 +188,14 @@ def _fill_financial_data(data, master_row, book_value_df, sic_mapping, ccm_looku
     data['gvkey'] = permno_match['gvkey'].value_counts().idxmax()
     data['gvkey_unique'] = len(permno_match['gvkey'].unique())
 
-    data['lpermno'] = permno = permno_match['lpermno'].value_counts().idxmax()
-    data['lpermno_unique'] = len(permno_match['lpermno'].unique())
+    data['LPERMNO'] = permno = permno_match['LPERMNO'].value_counts().idxmax()
+    data['LPERMNO_unique'] = len(permno_match['LPERMNO'].unique())
 
-    data['lpermco'] = permno_match['lpermco'].value_counts().idxmax()
-    data['lpermco_unique'] = len(permno_match['lpermco'].unique())
+    data['LPERMCO'] = permno_match['LPERMCO'].value_counts().idxmax()
+    data['LPERMCO_unique'] = len(permno_match['LPERMCO'].unique())
+
+    # This is for debugging
+    data['ccmlinktable_com_names'] = ';'.join(set(name.upper() for name in permno_match['conm']))
 
     if not permno or not perm_number_table_exists(PERMNO, permno):
         # No stock data at all
