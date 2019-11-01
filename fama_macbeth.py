@@ -100,8 +100,8 @@ def fama_macbeth(master):
     newey_west_df = pd.DataFrame(columns=['variable', 'coef', 'std_err', 'p_values', 't_values'])
     newey_west_df = newey_west_df.set_index(['variable'])
     for column_hat in cross_section_results:
-        # Python doesn't accept OLS without X so lets fill it with 1
         series = cross_section_results[column_hat]
+        # Python doesn't accept OLS without X so lets fill it with 1
         X = np.ones((series.shape[0],1))
         y = series
         # Newey-West standard errors with one lag
