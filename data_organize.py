@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 
+import multiprocessing
 import glob
 from sqlite3 import connect
 import time
@@ -15,9 +16,10 @@ import constants as C
 
 RE_DOCUMENT = re.compile(r"<DOCUMENT>([\w\W]*?)</DOCUMENT>", re.MULTILINE)
 
-def edit_master(MAIN, PERMNO):
-    master = pd.read_sql("select * from master", MAIN, index_col='index')
-    assert len(master) == 114186
+def edit_master(MAIN, PERMNO, index_inderval):
+    start, end = index_inderval
+
+    master = pd.read_sql(f"select * from master where `index` >= {start} and `index` <= {end}", MAIN, index_col='index')
 
     master['filingdate'] = pd.to_datetime(master['filingdate'], format='%Y%m%d')
 
@@ -317,10 +319,52 @@ def test():
     print(textual_data)
 
 
-def main():
+
+def create_file_data_que():
+    n = 114185
+    max_index = 0
+    que = []
+    while max_index < n:
+        new = max_index + 5000
+        que.append((max_index, new - 1))
+        max_index = new
+    return que
+
+def multiprocess_que(que):
+    n_process = multiprocessing.cpu_count()
+    print("Using {} processes".format(n_process))
+    p = multiprocessing.Pool(n_process)
+    try:
+        p.map(process_index_interval, que)
+    except KeyboardInterrupt:
+        print("Caught KeyboardInterrupt, terminating workers")
+        p.terminate()
+        p.join()
+
+    else:
+        print("Quitting normally")
+        p.close()
+        p.join()
+
+def process_index_interval(index_inderval):
     with connect(C.MAIN_DB_NAME) as MAIN, connect(C.PERMNO_DB_NAME) as PERMNO:
         # create_company_tables(MAIN, PERMNO)
-        edit_master(MAIN, PERMNO)
+        edit_master(MAIN, PERMNO, index_inderval)
+
+
+def main():
+
+    start = time.time()
+    print('\n' + time.strftime('%c') + f'\nND_SRAF:  Program {__name__}\n')
+    print("Extracting text from {} zip files.".format(len(C.FILE_LIST)))
+
+    que = create_file_data_que()
+    print("{} files in que.".format(len(que)))
+    multiprocess_que(que)
+
+    print(f'\n{__name__} | Normal termination | ' +
+          time.strftime('%H:%M:%S', time.gmtime(time.time() - start)))
+    print(time.strftime('%c'))
 
 if __name__ == '__main__':
     main()
