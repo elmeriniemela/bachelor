@@ -30,6 +30,8 @@ def get_master(MAIN):
         'quater',
     ]
 
+    import pdb; pdb.set_trace()
+
     # Select only specific columns
     master = master[useful_columns]
 
@@ -42,6 +44,7 @@ def get_master(MAIN):
     master['book_to_market'] = master.book_value_per_share / master.price_minus_one_day
 
 
+
     # FILTERING
 
     # Book-to-market COMPUSTAT data available and book value>0
@@ -50,10 +53,14 @@ def get_master(MAIN):
     master = master[master['price_minus_one_day'] >= 3]
     # Number of words in 10-K >= 2,000
     master = master[master['number_of_words'] >= 2000]
+    master = master[master['year'] >= 2009]
 
     # Eliminate all rows containing infinite and not nan values 
     master.replace([np.inf, -np.inf], np.nan, inplace=True)
     master = master.dropna(how='any')
+
+    master.loc[:,'median_filing_period_returns'] *= 1000
+
 
 
     # WINSORIZE
@@ -141,7 +148,6 @@ year   quater                                                                   
        3.0     0.019418         -0.001382  0.000300     -0.003137           -0.001855  1.768479e-03 -1.155023e-02 -5.693057e-19  ... -0.003280 -0.005939  0.003802  0.000000  0.000000 -0.017117 -0.001902   0.232993
        4.0     0.012565         -0.002575  0.002746     -0.006580            0.001234 -2.943220e-03 -7.729009e-16 -1.486560e-16  ...  0.000814 -0.002112  0.027833  0.001658  0.000000  0.010559  0.001760   0.295867
     """
-    
     newey_west_df = pd.DataFrame(columns=['variable', 'coef', 'std_err', 'p_values', 't_values'])
     newey_west_df = newey_west_df.set_index(['variable'])
     for column_hat in cross_section_results:

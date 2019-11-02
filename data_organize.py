@@ -113,7 +113,7 @@ def get_data_dict(master_row, book_value_df, sic_mapping, lm_dictionary, ccmlink
     if financial_data['median_filing_period_returns'] is not None:
         fname_path = os.path.join('parsed', str(financial_data['year']), master_row['fname'])
         textual_columns_count = len(textual_data.keys())
-        _fill_textual_data(textual_data, fname_path, master_row, lm_dictionary)
+        _fill_textual_data(textual_data, fname_path, lm_dictionary)
         assert len(textual_data.keys()) == textual_columns_count
 
     data = {}
@@ -122,7 +122,7 @@ def get_data_dict(master_row, book_value_df, sic_mapping, lm_dictionary, ccmlink
     return data
 
 
-def _fill_textual_data(row, fname, master_row, lm_dictionary):
+def _fill_textual_data(row, fname, lm_dictionary):
     if not os.path.isfile(fname):
         return
 
@@ -146,7 +146,9 @@ def _fill_textual_data(row, fname, master_row, lm_dictionary):
             if token not in vdictionary:
                 vdictionary[token] = 1
             if lm_dictionary[token].positive: row['percent_positive'] += 1
-            if lm_dictionary[token].negative: row['percent_negative'] += 1
+            if lm_dictionary[token].negative:
+                row['percent_negative'] += 1
+                print(token)
             if lm_dictionary[token].uncertainty: row['percent_uncertainty'] += 1
             if lm_dictionary[token].litigious: row['percent_litigious'] += 1
             if lm_dictionary[token].weak_modal: row['percent_modal_weak'] += 1
@@ -285,10 +287,37 @@ def create_based_on_permno(MAIN, PERMNO, perm_no):
 
 
 
+def test():
+    lm_dictionary = load_masterdictionary(C.MASTER_DICT_PATH)
+    textual_data = {
+        'file_size': 0, # 1
+        'number_of_words': 0, # 2
+        'percent_positive': 0, # 3
+        'percent_negative': 0, # 4
+        'percent_uncertainty': 0, # 5
+        'percent_litigious': 0, # 6
+        'percent_modal_weak': 0, # 7
+        'percent_modal_moderate': 0, # 8
+        'percent_modal_strong': 0, # 9
+        'percent_constraining': 0, # 10
+        'number_of_alphabetic': 0, # 11
+        'number_of_digits': 0, # 12
+        'number_of_numbers': 0, # 13
+        'avg_number_of_syllables_per_word': 0, # 14
+        'average_word_length': 0, # 15
+        'vocabulary': 0, # 16
+    }
+    fname = '/media/elmeri/T5-SSD/bachelor/parsed/2011/QTR1/20110228_10-K_edgar_data_73309_0001193125-11-049351_1.txt'
+    _fill_textual_data(textual_data, fname, lm_dictionary)
+    import pdb; pdb.set_trace()
+    print(textual_data)
+
+
 def main():
     with connect(C.MAIN_DB_NAME) as MAIN, connect(C.PERMNO_DB_NAME) as PERMNO:
         # create_company_tables(MAIN, PERMNO)
         edit_master(MAIN, PERMNO)
 
 if __name__ == '__main__':
-    main()
+    # main()
+    test()

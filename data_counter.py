@@ -7,7 +7,7 @@ import os
 
 import constants as C
 
-def zip_count()
+def zip_count():
     all_files = 0
 
     for fname in C.FILE_LIST:
@@ -71,3 +71,12 @@ def describe(CONN):
     print( "Total Number of Cells:\t%d" % totalCells )
 
 
+def read_file(path_to_zip, fname):
+    with zipfile.ZipFile(path_to_zip, mode='r') as _zipfile:
+        _zipfile.extract(fname, '/tmp/extract.txt')
+
+
+read_file(
+    '/media/elmeri/T5-SSD/bachelor/data/2011.zip',
+    'QTR1/20110228_10-K_edgar_data_73309_0001193125-11-049351_1.txt'
+)

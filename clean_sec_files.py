@@ -28,73 +28,43 @@ FILE_STATS = """\
 
 """
 
-
-def parsed_file_path(zip_path, year):
-    file_path = os.path.join('parsed', year, os.path.normpath(zip_path))
-    os.makedirs(os.path.dirname(file_path), exist_ok=True)
-    return file_path
-
-
-def get_text_lxml(html):
-    tree = BeautifulSoup(html, 'lxml')
-
-    res = defaultdict(int)
-
-    if tree is None:
-        return None
-        
-    for tag in tree.find_all('script'):
-        res['script'] += 1
-        tag.decompose()
-    for tag in tree.find_all('style'):
-        res['style'] += 1
-        tag.decompose()
-
-    for document in tree.find_all('document'):
-        res['document'] += 1
-        # Remove ASCII-Encoded segments – All document segment <TYPE> tags of GRAPHIC, ZIP, EXCEL, JSON, XML and PDF are deleted from the file.
-        doc_type = document.find('type')
-        if not doc_type:
-            continue
-        doc_type = doc_type.text
-        res[doc_type] += 1
-        # Remove ASCII-Encoded segments – All document segment <TYPE> tags of GRAPHIC, ZIP, EXCEL, JSON, XML and PDF are deleted from the file.
-        if doc_type in BAD_DOCUMENT_TYPES:
-            document.decompose()
-            continue
-        
-        # Remove all exhibitions 
-        # For example, post–Sarbanes-Oxley, most 10-Ks contain Exhibit 31.1, 
-        # pertainingto the certification of the 10-K by the CEO. 
-        # The standard exhibit includes anumber of negative words, 
-        # for example,untrue,omit,weaknesses,andfraud.
-        if doc_type.startswith('EX-'):
-            document.decompose()
-            continue
-
-    return tree.get_text(separator=' '), dict(res)
-
+GOOD_DOCUMENT_RE_LIST = [re.compile("<TYPE>{}</TYPE>".format(t), re.IGNORECASE) for t in C.PARM_FORMS]
 
 def extract_text(dest_path, raw_data):
     # Close type tag
     only_text = re.sub(r"<TYPE>(\S+)", r"<TYPE>\1</TYPE>", raw_data)
-
-    # Remove all XBRL – all characters between <XBRL …> … </XBRL> are deleted.
-    only_text = re.sub(r"<XBRL>.*?</XBRL>", "", only_text, re.DOTALL, re.S)
-
-    only_text = re.sub(r"-----BEGIN PRIVACY-ENHANCED MESSAGE-----", "", only_text)
-    only_text = re.sub(r"-----END PRIVACY-ENHANCED MESSAGE-----", "", only_text)
-
-    headermatch =  RE_SEC_HEADER.search(only_text)
-
     header = ''
+    headermatch =  RE_SEC_HEADER.search(only_text)
     if headermatch:
         header = headermatch.group()
         only_text = only_text.replace(header, '')
 
-    only_text, parse_res = get_text_lxml(only_text)
+    
+    # Remove all non 10-K documents like exhibitions xml files, json files, graphic files etc..
+    only_text = only_text.replace('\n', ';;;;;')
+    all_documets = re.findall(r'<DOCUMENT[\w\W]*?</DOCUMENT>', only_text, re.IGNORECASE)
+    kept_documents = [d for d in all_documets if any(RE.search(d) for RE in GOOD_DOCUMENT_RE_LIST)]
 
-    only_text = re.sub(r"<[\w\W]*?>", "", only_text, re.MULTILINE)
+
+    only_text = '\n'.join(kept_documents)
+
+
+    # Remove all XBRL – all characters between <XBRL …> … </XBRL> are deleted.
+    only_text = re.sub(r"<XBRL[\w\W]*?</XBRL>", "", only_text)
+
+    # Remove all tables
+    only_text = re.sub(r"<TABLE[\w\W]*?</TABLE>", "", only_text)
+
+
+    only_text = re.sub(r"-----BEGIN PRIVACY-ENHANCED MESSAGE-----", "", only_text)
+    only_text = re.sub(r"-----END PRIVACY-ENHANCED MESSAGE-----", "", only_text)
+    only_text = re.sub(r"<[\w\W]*?>", "", only_text)
+
+    only_text = re.sub(r"&nbsp;", " ", only_text, re.IGNORECASE)
+    only_text = re.sub(r"&#\d+;", " ", only_text, re.IGNORECASE)
+
+
+    only_text = '\n'.join(only_text.split(';;;;;'))
 
     # Remove non ascii chars
     only_text = ''.join(i if ord(i) < 128 else ' ' for i in only_text)
@@ -103,7 +73,7 @@ def extract_text(dest_path, raw_data):
     current_chars = len(only_text)
     percent_kept = (current_chars / original_chars) * 100
     process_index = multiprocessing.current_process().name
-    print("{:.2f} % ({}) {}    ----   {}".format(percent_kept, process_index, dest_path, parse_res))
+    print("{:.2f} % and {}/{} documents kept. ({}) {}".format(percent_kept, len(kept_documents), len(all_documets), process_index, dest_path))
 
     with open(dest_path, 'w') as f:
         f.write(FILE_STATS.format(
