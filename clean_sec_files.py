@@ -27,6 +27,7 @@ FILE_STATS = """\
 </FileStats>
 
 """
+FAKE_LINE_SEPARATOR = ';;;;;;;;;;;;;;;;;'
 
 GOOD_DOCUMENT_RE_LIST = [re.compile("<TYPE>{}</TYPE>".format(t), re.IGNORECASE) for t in C.PARM_FORMS]
 
@@ -40,8 +41,10 @@ def extract_text(dest_path, raw_data):
         only_text = only_text.replace(header, '')
 
     
+    # Lets do regex on one line, to make things easier
+    only_text = only_text.replace('\n', FAKE_LINE_SEPARATOR)
+
     # Remove all non 10-K documents like exhibitions xml files, json files, graphic files etc..
-    only_text = only_text.replace('\n', ';;;;;')
     all_documets = re.findall(r'<DOCUMENT[\w\W]*?</DOCUMENT>', only_text, re.IGNORECASE)
     kept_documents = [d for d in all_documets if any(RE.search(d) for RE in GOOD_DOCUMENT_RE_LIST)]
 
@@ -64,7 +67,8 @@ def extract_text(dest_path, raw_data):
     only_text = re.sub(r"&#\d+;", " ", only_text, re.IGNORECASE)
 
 
-    only_text = '\n'.join(only_text.split(';;;;;'))
+    # Add back line separators
+    only_text = only_text.replace(FAKE_LINE_SEPARATOR, '\n')
 
     # Remove non ascii chars
     only_text = ''.join(i if ord(i) < 128 else ' ' for i in only_text)
