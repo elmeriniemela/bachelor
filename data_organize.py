@@ -208,6 +208,7 @@ def _fill_financial_data(data, master_row, book_value_df, sic_mapping, ccmlinkta
     df['RET'] = pd.to_numeric(df['RET'], errors='coerce')
     df['VOL'] = pd.to_numeric(df['VOL'], errors='coerce')
     df['PRC'] = pd.to_numeric(df['PRC'], errors='coerce')
+    df['SHROUT'] = pd.to_numeric(df['SHROUT'], errors='coerce')
 
     #  If the closing price is not available on any given trading day, the number in the price field has a negative sign to indicate that it is a bid/ask average and not an actual closing price
     df['PRC'] = df['PRC'].abs()
@@ -228,15 +229,12 @@ def _fill_financial_data(data, master_row, book_value_df, sic_mapping, ccmlinkta
     idx = df.index.get_loc(row.name)
 
     # Use the row number to look for neighbour rows
-    prc = df.iloc[idx-1]['PRC']
 
-    VOL = df.iloc[idx-1]['VOL']
-    SHROUT = df.iloc[idx-1]['SHROUT']
 
     data['nasdaq_dummy'] = 1 if row['PRIMEXCH'] == 'Q' else 0
-    data['price_minus_one_day'] = float(prc) if prc else None
-    data['volume_minus_one_day'] = int(VOL) if VOL else None
-    data['shares_outstanding_minus_one_day'] = int(SHROUT) if SHROUT else None
+    data['price_minus_one_day'] = df.iloc[idx-1]['PRC']
+    data['volume_minus_one_day'] = df.iloc[idx-1]['VOL']
+    data['shares_outstanding_minus_one_day'] = df.iloc[idx-1]['SHROUT']
     data['ff_industry'] = sic_mapping.get(df.iloc[idx-1]['SICCD'])
     data['median_filing_period_returns'] = df.iloc[idx:idx+4]['RET'].median(axis=0)
     data['median_filing_period_value_weighted_returns'] = df.iloc[idx:idx+4]['vwretd'].median(axis=0)
@@ -248,7 +246,7 @@ def _fill_financial_data(data, master_row, book_value_df, sic_mapping, ccmlinkta
     if len(history) < 60 or not FILING_DATE_SHROUT:
         data['turnover'] = None
     else:
-        data['turnover'] = history['VOL'].sum(axis=0) / float(FILING_DATE_SHROUT)
+        data['turnover'] = history['VOL'].sum(axis=0) / FILING_DATE_SHROUT
 
     # Book-to-market COMPUSTAT data available
     company_values = book_value_df.loc[book_value_df['gvkey'] == data['gvkey']].loc[book_value_df['fyear'] == str(data['year'])]
