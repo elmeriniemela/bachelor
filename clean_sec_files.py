@@ -13,8 +13,6 @@ from helpers import quittable
 
 RE_SEC_HEADER = re.compile(r"<(IMS-HEADER|SEC-HEADER)>[\w\W]*?</(IMS-HEADER|SEC-HEADER)>", re.MULTILINE)
 
-BAD_DOCUMENT_TYPES = {'GRAPHIC', 'ZIP', 'EXCEL', 'JSON', 'PDF', 'XML'}
-
 FILE_STATS = """\
 <FileStats>
 
@@ -27,7 +25,6 @@ FILE_STATS = """\
 </FileStats>
 
 """
-FAKE_LINE_SEPARATOR = ';;;;;;;;;;;;;;;;;'
 
 GOOD_DOCUMENT_RE_LIST = [re.compile("<TYPE>{}</TYPE>".format(t), flags=re.IGNORECASE) for t in C.PARM_FORMS]
 
@@ -39,21 +36,16 @@ RE_TABLE = re.compile(r'<TABLE[ >][\w\W]*?</TABLE>', flags=re.IGNORECASE | re.MU
 
 RE_MARKUP = re.compile(r'<[\w\W]*?>', flags=re.IGNORECASE | re.MULTILINE)
 
-RE_MARKUP = re.compile(r'<[\w\W]*?>', flags=re.IGNORECASE | re.MULTILINE)
-
 RE_PRIVACY_START = re.compile(r'-----BEGIN PRIVACY-ENHANCED MESSAGE-----', flags=re.IGNORECASE)
 
 RE_PRIVACY_END = re.compile(r'-----END PRIVACY-ENHANCED MESSAGE-----', flags=re.IGNORECASE)
 
 
-RE_MARKUP_CHARS = re.compile(r'&#\d+;', flags=re.IGNORECASE)
-
-RE_NBSP = re.compile(r"&nbsp;", flags=re.IGNORECASE)
-
 RE_EXCESS_WHITESPACE = re.compile(r'\s{3,}')
 
+RE_PDF = re.compile(r'<FILENAME>.*?\.pdf')
 
-
+BAD_DOCUMENT_RE_LIST = [RE_PDF]
 
 
 def extract_text(dest_path, raw_data):
@@ -71,6 +63,8 @@ def extract_text(dest_path, raw_data):
     # Remove all non 10-K documents like exhibitions xml files, json files, graphic files etc..
     all_documets = RE_DOCUMENT.findall(only_text)
     kept_documents = [d for d in all_documets if any(RE.search(d) for RE in GOOD_DOCUMENT_RE_LIST)]
+    kept_documents = [d for d in kept_documents if not any(RE.search(d) for RE in BAD_DOCUMENT_RE_LIST)]
+
 
     only_text = '\n'.join(kept_documents)
 
@@ -86,11 +80,10 @@ def extract_text(dest_path, raw_data):
     # Remove all html tags
     only_text = RE_MARKUP.sub(" ", only_text)
 
-    # Remove html chars
-    only_text = RE_NBSP.sub(" ", only_text)
-    only_text = RE_MARKUP_CHARS.sub(" ", only_text)
-
     only_text = RE_EXCESS_WHITESPACE.sub(" ", only_text)
+
+    # Remove all html entities
+    only_text = BeautifulSoup(only_text, 'lxml').get_text(' ')
 
     # Remove non ascii chars
     only_text = ''.join(i if ord(i) < 128 else ' ' for i in only_text)
@@ -110,6 +103,11 @@ def extract_text(dest_path, raw_data):
         f.write(header)
         f.write('<DOCUMENT>\n' + only_text +'\n</DOCUMENT>')
 
+
+def parsed_file_path(zip_path, year):
+    file_path = os.path.join('parsed', year, os.path.normpath(zip_path))
+    os.makedirs(os.path.dirname(file_path), exist_ok=True)
+    return file_path
 
 
 def create_file_data_que():
@@ -176,13 +174,25 @@ def multiprocess_que(que):
 
 
 def test():
-    with open('/tmp/extract.txt/QTR1/20110228_10-K_edgar_data_73309_0001193125-11-049351_1.txt', 'rb') as f_obj:
-        data = f_obj.read().decode(errors='ignore')
-    
-    extract_text(
-        '/tmp/test.txt',
-        data
-    )
+
+    def parse_one_file(fname):
+        year = fname[5:9]
+        data_zip = f'/media/elmeri/T5-SSD/bachelor/data/{year}.zip'
+        with zipfile.ZipFile(data_zip, mode='r') as _zipfile:
+            _zipfile.extract(fname, '/tmp')
+        with open('/tmp/' + fname, 'rb') as f_obj:
+            data = f_obj.read().decode(errors='ignore')
+        
+        extract_text(
+            '/tmp/test.txt',
+            data
+        )
+
+
+
+    parse_one_file('QTR1/20080222_10-K_edgar_data_1000229_0001000229-08-000005_1.txt')
+
+    parse_one_file('QTR1/20110228_10-K_edgar_data_73309_0001193125-11-049351_1.txt')
 
 if __name__ == '__main__':
     main()
