@@ -23,6 +23,7 @@ def edit_master(MAIN, PERMNO):
 
     ccmlinktable = pd.read_csv('ccmlinktable.csv', index_col=None, header=0, sep=',', dtype=str)
     ccmlinktable['LINKDT'] = pd.to_datetime(ccmlinktable['LINKDT'], format='%Y%m%d')
+    #  E means that its valid currently so change that to 2050 so we can do datetime comparisons
     ccmlinktable.LINKENDDT = ccmlinktable.LINKENDDT.replace({"E": "20500101"})
     ccmlinktable['LINKENDDT'] = pd.to_datetime(ccmlinktable['LINKENDDT'], format='%Y%m%d')
     ccmlinktable['LPERMNO'] = ccmlinktable['LPERMNO'].fillna(0).astype(int)
@@ -36,7 +37,7 @@ def edit_master(MAIN, PERMNO):
     book_value_df = pd.read_csv('book_value.csv', index_col=None, header=0, sep=',', dtype=str)
 
     cur = MAIN.cursor()
-    res = cur.execute("SELECT SIC, FF_NUMBER FROM sic_mapping")
+    res = cur.execute("SELECT SIC, FF_CATEGORY FROM sic_mapping")
     sic_mapping = {r[0]: r[1] for r in res.fetchall()}
 
     callback_args = (
@@ -44,7 +45,6 @@ def edit_master(MAIN, PERMNO):
         sic_mapping,
         lm_dictionary,
         ccmlinktable,
-        MAIN,
         PERMNO,
     )
 
@@ -66,7 +66,7 @@ def apply_dict(callback, *args, **kwargs):
     return pd.Series(list(data.values()), index=list(data.keys()))
 
 
-def get_data_dict(master_row, book_value_df, sic_mapping, lm_dictionary, ccmlinktable, MAIN, PERMNO):
+def get_data_dict(master_row, book_value_df, sic_mapping, lm_dictionary, ccmlinktable, PERMNO):
     financial_data = {
         'gvkey': None,
         'gvkey_unique': None,
@@ -75,7 +75,7 @@ def get_data_dict(master_row, book_value_df, sic_mapping, lm_dictionary, ccmlink
         'LPERMCO': None,
         'LPERMCO_unique': None,
         'ccmlinktable_com_names': None,
-        'returns_missing_filtered': None,
+        'nasdaq_dummy': None, 
         'price_minus_one_day': None, 
         'volume_minus_one_day': None,
         'shares_outstanding_minus_one_day': None,
@@ -88,7 +88,7 @@ def get_data_dict(master_row, book_value_df, sic_mapping, lm_dictionary, ccmlink
         'year': int(master_row['fname'][5:9]),
     }
     financial_columns_count = len(financial_data.keys())
-    _fill_financial_data(financial_data, master_row, book_value_df, sic_mapping, ccmlinktable, MAIN, PERMNO)
+    _fill_financial_data(financial_data, master_row, book_value_df, sic_mapping, ccmlinktable, PERMNO)
     assert len(financial_data.keys()) == financial_columns_count
 
     textual_data = {
@@ -148,7 +148,7 @@ def _fill_textual_data(row, fname, lm_dictionary):
             if lm_dictionary[token].positive: row['percent_positive'] += 1
             if lm_dictionary[token].negative:
                 row['percent_negative'] += 1
-                print(token)
+                # print(token)
             if lm_dictionary[token].uncertainty: row['percent_uncertainty'] += 1
             if lm_dictionary[token].litigious: row['percent_litigious'] += 1
             if lm_dictionary[token].weak_modal: row['percent_modal_weak'] += 1
@@ -177,7 +177,7 @@ def _fill_textual_data(row, fname, lm_dictionary):
     return
 
 
-def _fill_financial_data(data, master_row, book_value_df, sic_mapping, ccmlinktable, MAIN, PERMNO):
+def _fill_financial_data(data, master_row, book_value_df, sic_mapping, ccmlinktable, PERMNO):
     permno_match = ccmlinktable[
         (ccmlinktable['LINKDT'] <= master_row['filingdate']) 
         & (ccmlinktable['LINKENDDT'] >= master_row['filingdate']) 
@@ -204,14 +204,15 @@ def _fill_financial_data(data, master_row, book_value_df, sic_mapping, ccmlinkta
         return
 
     df = pd.read_sql("select * from '%s'" % permno, PERMNO, index_col='rowid')
+    # If ‘coerce’, then invalid parsing will be set as NaN
     df['RET'] = pd.to_numeric(df['RET'], errors='coerce')
     df['VOL'] = pd.to_numeric(df['VOL'], errors='coerce')
+    df['PRC'] = pd.to_numeric(df['PRC'], errors='coerce')
 
-    before = len(df.index)
-    df = df[df['RET'] > -0.66]
-    df = df[np.isfinite(df['VOL'])]
-    after = len(df.index)
-    data['returns_missing_filtered'] = before - after
+    #  If the closing price is not available on any given trading day, the number in the price field has a negative sign to indicate that it is a bid/ask average and not an actual closing price
+    df['PRC'] = df['PRC'].abs()
+    # df['PRC'].values[df['PRC'].values < 0] = np.nan
+
     df['date'] = pd.to_datetime(df['date'])
     df.sort_values(by=['date'], inplace=True)
     sub_df = df.loc[df['date'] == master_row['filingdate']]
@@ -220,14 +221,19 @@ def _fill_financial_data(data, master_row, book_value_df, sic_mapping, ccmlinkta
         # No stock data on filing date
         return 
 
+    # First row from the queried df
     row = sub_df.iloc[0]
+
+    # Get the row number from original df based on index (row.name)
     idx = df.index.get_loc(row.name)
-    history = df.iloc[idx - 60 : idx + 60]
+
+    # Use the row number to look for neighbour rows
     prc = df.iloc[idx-1]['PRC']
 
     VOL = df.iloc[idx-1]['VOL']
     SHROUT = df.iloc[idx-1]['SHROUT']
 
+    data['nasdaq_dummy'] = 1 if row['PRIMEXCH'] == 'Q' else 0
     data['price_minus_one_day'] = float(prc) if prc else None
     data['volume_minus_one_day'] = int(VOL) if VOL else None
     data['shares_outstanding_minus_one_day'] = int(SHROUT) if SHROUT else None
@@ -239,7 +245,7 @@ def _fill_financial_data(data, master_row, book_value_df, sic_mapping, ccmlinkta
     FILING_DATE_SHROUT = df.iloc[idx]['SHROUT']
     # The volume of shares traded in days [−252,−6] prior to thefile date divided by shares outstanding on the file date. 
     # Atleast 60 observations of daily volume must be available to be included in the sample.
-    if len(history) < 60 or not SHROUT:
+    if len(history) < 60 or not FILING_DATE_SHROUT:
         data['turnover'] = None
     else:
         data['turnover'] = history['VOL'].sum(axis=0) / float(FILING_DATE_SHROUT)
@@ -319,5 +325,5 @@ def main():
         edit_master(MAIN, PERMNO)
 
 if __name__ == '__main__':
-    # main()
-    test()
+    main()
+    # test()
