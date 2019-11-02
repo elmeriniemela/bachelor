@@ -29,11 +29,38 @@ FILE_STATS = """\
 """
 FAKE_LINE_SEPARATOR = ';;;;;;;;;;;;;;;;;'
 
-GOOD_DOCUMENT_RE_LIST = [re.compile("<TYPE>{}</TYPE>".format(t), re.IGNORECASE) for t in C.PARM_FORMS]
+GOOD_DOCUMENT_RE_LIST = [re.compile("<TYPE>{}</TYPE>".format(t), flags=re.IGNORECASE) for t in C.PARM_FORMS]
+
+RE_DOCUMENT = re.compile(r'<DOCUMENT[ >][\w\W]*?</DOCUMENT>', flags=re.IGNORECASE | re.MULTILINE)
+
+RE_XBRL = re.compile(r'<XBRL[ >][\w\W]*?</XBRL>', flags=re.IGNORECASE | re.MULTILINE)
+
+RE_TABLE = re.compile(r'<TABLE[ >][\w\W]*?</TABLE>', flags=re.IGNORECASE | re.MULTILINE)
+
+RE_MARKUP = re.compile(r'<[\w\W]*?>', flags=re.IGNORECASE | re.MULTILINE)
+
+RE_MARKUP = re.compile(r'<[\w\W]*?>', flags=re.IGNORECASE | re.MULTILINE)
+
+RE_PRIVACY_START = re.compile(r'-----BEGIN PRIVACY-ENHANCED MESSAGE-----', flags=re.IGNORECASE)
+
+RE_PRIVACY_END = re.compile(r'-----END PRIVACY-ENHANCED MESSAGE-----', flags=re.IGNORECASE)
+
+
+RE_MARKUP_CHARS = re.compile(r'&#\d+;', flags=re.IGNORECASE)
+
+RE_NBSP = re.compile(r"&nbsp;", flags=re.IGNORECASE)
+
+RE_EXCESS_WHITESPACE = re.compile(r'\s{3,}')
+
+
+
+
 
 def extract_text(dest_path, raw_data):
     # Close type tag
     only_text = re.sub(r"<TYPE>(\S+)", r"<TYPE>\1</TYPE>", raw_data)
+
+    # Save SEC header
     header = ''
     headermatch =  RE_SEC_HEADER.search(only_text)
     if headermatch:
@@ -41,34 +68,29 @@ def extract_text(dest_path, raw_data):
         only_text = only_text.replace(header, '')
 
     
-    # Lets do regex on one line, to make things easier
-    only_text = only_text.replace('\n', FAKE_LINE_SEPARATOR)
-
     # Remove all non 10-K documents like exhibitions xml files, json files, graphic files etc..
-    all_documets = re.findall(r'<DOCUMENT[\w\W]*?</DOCUMENT>', only_text, re.IGNORECASE)
+    all_documets = RE_DOCUMENT.findall(only_text)
     kept_documents = [d for d in all_documets if any(RE.search(d) for RE in GOOD_DOCUMENT_RE_LIST)]
-
 
     only_text = '\n'.join(kept_documents)
 
-
     # Remove all XBRL – all characters between <XBRL …> … </XBRL> are deleted.
-    only_text = re.sub(r"<XBRL[\w\W]*?</XBRL>", "", only_text)
+    only_text = RE_XBRL.sub(" ", only_text)
 
     # Remove all tables
-    only_text = re.sub(r"<TABLE[\w\W]*?</TABLE>", "", only_text)
+    only_text = RE_TABLE.sub(" ", only_text)
 
+    only_text = RE_PRIVACY_START.sub(" ", only_text)
+    only_text = RE_PRIVACY_END.sub(" ", only_text)
 
-    only_text = re.sub(r"-----BEGIN PRIVACY-ENHANCED MESSAGE-----", "", only_text)
-    only_text = re.sub(r"-----END PRIVACY-ENHANCED MESSAGE-----", "", only_text)
-    only_text = re.sub(r"<[\w\W]*?>", "", only_text)
+    # Remove all html tags
+    only_text = RE_MARKUP.sub(" ", only_text)
 
-    only_text = re.sub(r"&nbsp;", " ", only_text, re.IGNORECASE)
-    only_text = re.sub(r"&#\d+;", " ", only_text, re.IGNORECASE)
+    # Remove html chars
+    only_text = RE_NBSP.sub(" ", only_text)
+    only_text = RE_MARKUP_CHARS.sub(" ", only_text)
 
-
-    # Add back line separators
-    only_text = only_text.replace(FAKE_LINE_SEPARATOR, '\n')
+    only_text = RE_EXCESS_WHITESPACE.sub(" ", only_text)
 
     # Remove non ascii chars
     only_text = ''.join(i if ord(i) < 128 else ' ' for i in only_text)
@@ -152,5 +174,16 @@ def multiprocess_que(que):
         p.join()
 
 
+
+def test():
+    with open('/tmp/extract.txt/QTR1/20110228_10-K_edgar_data_73309_0001193125-11-049351_1.txt', 'rb') as f_obj:
+        data = f_obj.read().decode(errors='ignore')
+    
+    extract_text(
+        '/tmp/test.txt',
+        data
+    )
+
 if __name__ == '__main__':
     main()
+    # test()
