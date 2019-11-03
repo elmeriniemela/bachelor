@@ -185,9 +185,9 @@ def do_normal_analysis(MAIN):
 def main():
     with connect(C.MAIN_DB_NAME) as MAIN:
         # do_normal_analysis(MAIN)
-        # do_fama_macbeth_analysis(MAIN)
+        do_fama_macbeth_analysis(MAIN)
         # do_sample_profiling(MAIN)
-        do_full_data_profiling(MAIN)
+        # do_full_data_profiling(MAIN)
 
 
 if __name__ == '__main__':
