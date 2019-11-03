@@ -9,14 +9,34 @@ import matplotlib.pyplot as plt
 from scipy.stats.mstats import winsorize
 import pandas_profiling
 
-def do_profiling(master, profiling_vars):
-    print("Creating profiling...")
-    summary_df = master[profiling_vars]
-    profile = summary_df.profile_report(title='Data Profiling Report')
+def do_full_data_profiling(MAIN):
+    print("Creating full data profiling...")
+    master = pd.read_sql("select * from master_edited", MAIN, index_col='index')
+    profile = master.profile_report(title='Data Profiling Report')
+    profile.to_file(output_file="full_dataset.html")
+
+def do_sample_profiling(MAIN):
+    print("Creating sample profiling...")
+    master, outcome_var, _ = prepare_analysis(MAIN)
+
+    profiling_vars = [
+        outcome_var,
+        'percent_negative', 
+        'log_size', 
+        'log_turnover', 
+        'log_book_to_market',
+        'median_filing_period_value_weighted_returns',
+        'size', 
+        'book_to_market', 
+        'turnover',
+    ]
+
+    profile = master[profiling_vars].profile_report(title='Data Profiling Report')
     profile.to_file(output_file="index.html")
 
 
-def do_analysis(MAIN):
+
+def prepare_analysis(MAIN):
     master = pd.read_sql("select * from master_edited", MAIN, index_col='index')
 
     # Mapping for renaming the colums for profiling
@@ -30,7 +50,10 @@ def do_analysis(MAIN):
         'percent_negative',
         'book_value_per_share',
         'ff_industry',
+        'nasdaq_dummy',
         'turnover',
+        'year',
+        'quater',
     ]
 
     # Select only specific columns
@@ -45,6 +68,7 @@ def do_analysis(MAIN):
     master['book_to_market'] = master.book_value_per_share / master.price_minus_one_day
 
 
+
     # FILTERING
 
     # Book-to-market COMPUSTAT data available and book value>0
@@ -53,11 +77,14 @@ def do_analysis(MAIN):
     master = master[master['price_minus_one_day'] >= 3]
     # Number of words in 10-K >= 2,000
     master = master[master['number_of_words'] >= 2000]
+    master = master[master['year'] >= 2009]
 
     # Eliminate all rows containing infinite and not nan values 
     master.replace([np.inf, -np.inf], np.nan, inplace=True)
     master = master.dropna(how='any')
 
+    # Multiply coefficients
+    master.loc[:,'median_filing_period_returns'] *= 100
 
     # WINSORIZE
 
@@ -79,17 +106,63 @@ def do_analysis(MAIN):
     # Create 48 - 1 FF industry dummies
     master = pd.concat([master, pd.get_dummies(master['ff_industry'], drop_first=True)], axis=1)
 
-    ff_categories = [str(n) for n in range(2, 49)]
+    master.replace([np.inf, -np.inf], np.nan, inplace=True)
+    master = master.dropna(how='any')
 
+    ff_categories = [n for n in master['ff_industry'].unique() if n in master.columns]
     outcome_var = 'median_filing_period_returns'
-    predictor_vars = ['percent_negative', 'log_size', 'log_turnover', 'log_book_to_market']
-    profiling_vars = predictor_vars + [outcome_var, 'median_filing_period_value_weighted_returns', 'size', 'book_to_market', 'turnover']
-
-    # do_profiling(master, profiling_vars)
-
-    # Binary values don't work in profiling, so add them after
+    predictor_vars = ['percent_negative', 'log_size', 'log_turnover', 'log_book_to_market', 'nasdaq_dummy']
     predictor_vars.extend(ff_categories)
+
+    return master, outcome_var, predictor_vars
     
+
+def ols_coef(section, outcome_var, predictor_vars):
+    X = section[predictor_vars]
+    y = section[outcome_var]
+    X = sm.add_constant(X)
+    model = sm.OLS(y, X).fit()
+    series = model.params
+    # Add r_squared so we can take the mean later
+    series['r_squared'] = model.rsquared_adj
+    return series
+
+
+def do_fama_macbeth_analysis(MAIN):
+    master, outcome_var, predictor_vars = prepare_analysis(MAIN)
+    
+    cross_sections = master.groupby(by=['year', 'quater'])
+    cross_section_results = cross_sections.apply(ols_coef, outcome_var, predictor_vars)
+    print(cross_section_results)
+    newey_west_df = pd.DataFrame(columns=['variable', 'coef', 'std_err', 'p_values', 't_values'])
+    newey_west_df = newey_west_df.set_index(['variable'])
+    for column_hat in cross_section_results:
+        if column_hat == 'r_squared':
+            # This is not supposed to be t tested
+            # we saved it only for the average
+            continue
+        series = cross_section_results[column_hat]
+        # Python doesn't accept OLS without X so lets fill it with 1
+        X = np.ones((series.shape[0],1))
+        y = series
+        # Newey-West standard errors with one lag
+        model = sm.OLS(y, X).fit(cov_type='HAC', cov_kwds={'maxlags':1})
+        import pdb; pdb.set_trace()
+        row = [
+            model.params[0], # coef
+            model.bse[0], # std_err
+            model.pvalues[0], # p_values
+            model.tvalues[0], # t_values
+        ]
+        newey_west_df.loc[column_hat] = row
+
+    print("Average Adjusted R-Squared: ", cross_section_results['r_squared'].mean())
+    print(newey_west_df)
+
+
+def do_normal_analysis(MAIN):
+    master, outcome_var, predictor_vars = prepare_analysis(MAIN)
+
     X = master[predictor_vars]
     y = master[outcome_var]
 
@@ -101,7 +174,9 @@ def do_analysis(MAIN):
 
 def main():
     with connect(C.MAIN_DB_NAME) as MAIN:
-        do_analysis(MAIN)
+        # do_normal_analysis(MAIN)
+        # do_fama_macbeth_analysis(MAIN)
+        do_sample_profiling(MAIN)
 
 
 if __name__ == '__main__':
