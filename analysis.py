@@ -121,6 +121,15 @@ def prepare_analysis(MAIN):
     master = master.dropna(how='any')
 
     ff_categories = [n for n in master['ff_industry'].unique() if n in master.columns]
+
+    # In all cases, the excess return refers to the firm’s buy-and-hold stock return
+    # minus the CRSP value-weighted buy-and-hold market indexreturn over the 4-day event window.
+    # IS THIS CORRECT??
+
+    # event period excess return defined as the firm’s buy-and-hold stock return
+    # minus the CRSP value-weighted buy-and-hold market index return
+    # over the 4-day event window, expressed as a percent.
+    
     outcome_var = 'median_filing_period_returns'
     predictor_vars = ['percent_negative', 'log_size', 'log_turnover', 'log_book_to_market', 'nasdaq_dummy']
     predictor_vars.extend(ff_categories)

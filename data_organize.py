@@ -10,8 +10,11 @@ import re
 import os
 import string
 from helpers import load_masterdictionary
+from scipy import stats
 
 import constants as C
+
+from permno_tables import perm_number_table_exists
 
 RE_DOCUMENT = re.compile(r"<DOCUMENT>([\w\W]*?)</DOCUMENT>", re.MULTILINE)
 
@@ -40,11 +43,21 @@ def edit_master(MAIN, PERMNO):
     res = cur.execute("SELECT SIC, FF_CATEGORY FROM sic_mapping")
     sic_mapping = {r[0]: r[1] for r in res.fetchall()}
 
+
+    market_df = pd.read_csv('market_index.csv', index_col=None, header=0, sep=',', dtype=str)
+    market_df['DATE'] = pd.to_datetime(market_df['DATE'], format='%Y%m%d')
+    market_df['vwretd'] = pd.to_numeric(market_df['vwretd'], errors='coerce')
+    market_df.rename(
+        columns={'DATE': 'market_date'},
+        inplace=True
+    )
+
     callback_args = (
         book_value_df,
         sic_mapping,
         lm_dictionary,
         ccmlinktable,
+        market_df,
         PERMNO,
     )
 
@@ -66,7 +79,7 @@ def apply_dict(callback, *args, **kwargs):
     return pd.Series(list(data.values()), index=list(data.keys()))
 
 
-def get_data_dict(master_row, book_value_df, sic_mapping, lm_dictionary, ccmlinktable, PERMNO):
+def get_data_dict(master_row, book_value_df, sic_mapping, lm_dictionary, ccmlinktable, market_df, PERMNO):
     financial_data = {
         'gvkey': None,
         'gvkey_unique': None,
@@ -80,15 +93,15 @@ def get_data_dict(master_row, book_value_df, sic_mapping, lm_dictionary, ccmlink
         'volume_minus_one_day': None,
         'shares_outstanding_minus_one_day': None,
         'ff_industry': None,
-        'median_filing_period_returns': None, 
-        'median_filing_period_value_weighted_returns': None,
+        'RET_qeom': None, 
+        'market_vwretd_qeom': None,
         'turnover': None,
         'book_value_per_share': None,
         'quater': int(master_row['fname'][3:4]),
         'year': int(master_row['fname'][5:9]),
     }
     financial_columns_count = len(financial_data.keys())
-    _fill_financial_data(financial_data, master_row, book_value_df, sic_mapping, ccmlinktable, PERMNO)
+    _fill_financial_data(financial_data, master_row, book_value_df, sic_mapping, ccmlinktable, market_df, PERMNO)
     assert len(financial_data.keys()) == financial_columns_count
 
     textual_data = {
@@ -110,7 +123,7 @@ def get_data_dict(master_row, book_value_df, sic_mapping, lm_dictionary, ccmlink
         'vocabulary': 0, # 16
     }
 
-    if financial_data['median_filing_period_returns'] is not None:
+    if financial_data['RET_qeom'] is not None:
         fname_path = os.path.join('parsed', str(financial_data['year']), master_row['fname'])
         textual_columns_count = len(textual_data.keys())
         _fill_textual_data(textual_data, fname_path, lm_dictionary)
@@ -177,7 +190,7 @@ def _fill_textual_data(row, fname, lm_dictionary):
     return
 
 
-def _fill_financial_data(data, master_row, book_value_df, sic_mapping, ccmlinktable, PERMNO):
+def _fill_financial_data(data, master_row, book_value_df, sic_mapping, ccmlinktable, market_df, PERMNO):
     permno_match = ccmlinktable[
         (ccmlinktable['LINKDT'] <= master_row['filingdate']) 
         & (ccmlinktable['LINKENDDT'] >= master_row['filingdate']) 
@@ -230,14 +243,32 @@ def _fill_financial_data(data, master_row, book_value_df, sic_mapping, ccmlinkta
 
     # Use the row number to look for neighbour rows
 
+    four_day_period = df.iloc[idx:idx+4]
 
     data['nasdaq_dummy'] = 1 if row['PRIMEXCH'] == 'Q' else 0
     data['price_minus_one_day'] = df.iloc[idx-1]['PRC']
     data['volume_minus_one_day'] = df.iloc[idx-1]['VOL']
     data['shares_outstanding_minus_one_day'] = df.iloc[idx-1]['SHROUT']
     data['ff_industry'] = sic_mapping.get(df.iloc[idx-1]['SICCD'])
-    data['median_filing_period_returns'] = df.iloc[idx:idx+4]['RET'].median(axis=0)
-    data['median_filing_period_value_weighted_returns'] = df.iloc[idx:idx+4]['vwretd'].median(axis=0)
+
+
+    RET_four_day_period = four_day_period["RET"]
+    RET_four_day_period += 1
+    data['RET_qeom'] = stats.gmean(RET_four_day_period)
+
+    # vwretd_four_day_period = four_day_period["vwretd"]
+    # vwretd_four_day_period += 1
+    # data['vwretd_qeom'] = stats.gmean(RET_four_day_period)
+
+    max_date = four_day_period['date'].max()
+    min_date = four_day_period['date'].min()
+    market_four_day_period = market_df[(market_df['market_date'] <= max_date) & (market_df['market_date'] >= min_date)]
+
+    vwretd_market_four_day_period = market_four_day_period['vwretd']
+    vwretd_market_four_day_period += 1
+    data['market_vwretd_qeom'] = stats.gmean(vwretd_market_four_day_period)
+
+
 
     history = df.iloc[idx - 252 : idx -6]
     FILING_DATE_SHROUT = df.iloc[idx]['SHROUT']
