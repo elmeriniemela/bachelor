@@ -12,12 +12,12 @@ import pandas_profiling
 def do_full_data_profiling(MAIN):
     print("Creating full data profiling...")
     profiling_vars = [
-        'median_filing_period_returns',
+        'RET_qeom',
         'percent_negative', 
         'price_minus_one_day', 
         'shares_outstanding_minus_one_day', 
         'book_value_per_share',
-        'median_filing_period_value_weighted_returns',
+        'market_vwretd_qeom',
         'turnover',
         'number_of_words',
         'nasdaq_dummy',
@@ -39,7 +39,8 @@ def do_sample_profiling(MAIN):
         'log_size', 
         'log_turnover', 
         'log_book_to_market',
-        'median_filing_period_value_weighted_returns',
+        'market_vwretd_qeom',
+        'RET_qeom', 
         'size', 
         'book_to_market', 
         'turnover',
@@ -58,8 +59,8 @@ def prepare_analysis(MAIN):
         'price_minus_one_day',
         'volume_minus_one_day',
         'shares_outstanding_minus_one_day',
-        'median_filing_period_returns', 
-        'median_filing_period_value_weighted_returns',
+        'RET_qeom', 
+        'market_vwretd_qeom',
         'number_of_words', 
         'percent_negative',
         'book_value_per_share',
@@ -82,6 +83,8 @@ def prepare_analysis(MAIN):
     #  Book Value Per Share / Price per share
     master['book_to_market'] = master.book_value_per_share / master.price_minus_one_day
 
+    master['excess_returns'] = master.RET_qeom - master.market_vwretd_qeom
+
 
 
     # FILTERING
@@ -99,14 +102,14 @@ def prepare_analysis(MAIN):
     master = master.dropna(how='any')
 
     # Multiply coefficients
-    master.loc[:,'median_filing_period_returns'] *= 100
+    # master.loc[:,'RET_qeom'] *= 100
 
     # WINSORIZE
 
     # we winsorize the book-to-market variable at the 1% level.
     master['book_to_market'] = winsorize(master['book_to_market'], limits=(0.01, 0.01))
     # master['percent_negative'] = winsorize(master['percent_negative'], limits=(0.01, 0.01))
-    # master['median_filing_period_returns'] = winsorize(master['median_filing_period_returns'], limits=(0.01, 0.01))
+    # master['RET_qeom'] = winsorize(master['RET_qeom'], limits=(0.01, 0.01))
 
     # LOG
     # Use log values for regression
@@ -120,18 +123,16 @@ def prepare_analysis(MAIN):
     master.replace([np.inf, -np.inf], np.nan, inplace=True)
     master = master.dropna(how='any')
 
-    ff_categories = [n for n in master['ff_industry'].unique() if n in master.columns]
 
     # In all cases, the excess return refers to the firm’s buy-and-hold stock return
     # minus the CRSP value-weighted buy-and-hold market indexreturn over the 4-day event window.
-    # IS THIS CORRECT??
 
     # event period excess return defined as the firm’s buy-and-hold stock return
     # minus the CRSP value-weighted buy-and-hold market index return
     # over the 4-day event window, expressed as a percent.
-    
-    outcome_var = 'median_filing_period_returns'
+    outcome_var = 'excess_returns'
     predictor_vars = ['percent_negative', 'log_size', 'log_turnover', 'log_book_to_market', 'nasdaq_dummy']
+    ff_categories = [n for n in master['ff_industry'].unique() if n in master.columns]
     predictor_vars.extend(ff_categories)
 
     return master, outcome_var, predictor_vars
