@@ -11,8 +11,22 @@ import pandas_profiling
 
 def do_full_data_profiling(MAIN):
     print("Creating full data profiling...")
+    profiling_vars = [
+        'median_filing_period_returns',
+        'percent_negative', 
+        'price_minus_one_day', 
+        'shares_outstanding_minus_one_day', 
+        'book_value_per_share',
+        'median_filing_period_value_weighted_returns',
+        'turnover',
+        'number_of_words',
+        'nasdaq_dummy',
+        'LPERMNO_unique',
+        'year',
+        'quater',
+    ]
     master = pd.read_sql("select * from master_edited", MAIN, index_col='index')
-    profile = master.profile_report(title='Data Profiling Report')
+    profile = master[profiling_vars].profile_report(title='Data Profiling Report')
     profile.to_file(output_file="full_dataset.html")
 
 def do_sample_profiling(MAIN):
@@ -54,6 +68,7 @@ def prepare_analysis(MAIN):
         'turnover',
         'year',
         'quater',
+        # 'LPERMNO_unique',
     ]
 
     # Select only specific columns
@@ -92,12 +107,8 @@ def prepare_analysis(MAIN):
     master['book_to_market'] = winsorize(master['book_to_market'], limits=(0.01, 0.01))
     # master['percent_negative'] = winsorize(master['percent_negative'], limits=(0.01, 0.01))
     # master['median_filing_period_returns'] = winsorize(master['median_filing_period_returns'], limits=(0.01, 0.01))
-    # master['turnover'] = winsorize(master['turnover'], limits=(0.01, 0.01))
-    # master['size'] = winsorize(master['size'], limits=(0.01, 0.01))
-
 
     # LOG
-
     # Use log values for regression
     master['log_size'] = np.log(master['size'])
     master['log_book_to_market'] = np.log(master['book_to_market'])
@@ -147,7 +158,6 @@ def do_fama_macbeth_analysis(MAIN):
         y = series
         # Newey-West standard errors with one lag
         model = sm.OLS(y, X).fit(cov_type='HAC', cov_kwds={'maxlags':1})
-        import pdb; pdb.set_trace()
         row = [
             model.params[0], # coef
             model.bse[0], # std_err
@@ -176,7 +186,8 @@ def main():
     with connect(C.MAIN_DB_NAME) as MAIN:
         # do_normal_analysis(MAIN)
         # do_fama_macbeth_analysis(MAIN)
-        do_sample_profiling(MAIN)
+        # do_sample_profiling(MAIN)
+        do_full_data_profiling(MAIN)
 
 
 if __name__ == '__main__':
