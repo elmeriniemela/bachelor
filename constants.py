@@ -51,4 +51,5 @@ PARM_EDGARPREFIX = 'https://www.sec.gov/Archives/'
 
 PERMNO_DB_NAME = "PERMNO.db"
 MAIN_DB_NAME = "MAIN.db"
+ALL_STOCKS_DB_NAME = "ALL_STOCKS.db"
 MASTER_DICT_PATH = 'original_files/LoughranMcDonald_MasterDictionary_2018.csv'
