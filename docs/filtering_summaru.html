@@ -1,0 +1,74 @@
+<!-- Latest compiled and minified CSS -->
+<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css" integrity="sha384-HSMxcRTRxnN+Bdg0JdbxYKrThecOKuH5zCYotlSAcp1+c8xmyTe9GYg1l9a69psu" crossorigin="anonymous">
+
+<!-- Optional theme -->
+<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap-theme.min.css" integrity="sha384-6pzBo3FDv/PJ8r2KRkGHifhEocL+1X2rVCTTkUfGk7/0pbek5mMa1upzvWbrUbOZ" crossorigin="anonymous">
+
+<!-- Latest compiled and minified JavaScript -->
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js" integrity="sha384-aJ21OjlMXNL5UyIl/XNwTMqvzeRMZH2w8c5cRVpzpU8Y5bApTppSuUkhZXN0VxHd" crossorigin="anonymous"></script>
+<table class="dataframe table">
+    <thead>
+        <tr style="text-align: right;">
+            <th></th>
+            <th>Source/Filter</th>
+            <th>Sample Size</th>
+            <th>Observations Removed</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <th>0</th>
+            <td>Full 10-K Document EDGAR 10-K/10-K405 1994-2008 complete sample</td>
+            <td>203567</td>
+            <td></td>
+        </tr>
+        <tr>
+            <th>1</th>
+            <td>Include only first filing in a given year</td>
+            <td>201006</td>
+            <td>2561</td>
+        </tr>
+        <tr>
+            <th>2</th>
+            <td>CRSP PERMNO match</td>
+            <td>129055</td>
+            <td>71951</td>
+        </tr>
+        <tr>
+            <th>3</th>
+            <td>CRSP market capitalization data available</td>
+            <td>91714</td>
+            <td>37341</td>
+        </tr>
+        <tr>
+            <th>4</th>
+            <td>Price on filing date day minus one ≥ $3</td>
+            <td>76672</td>
+            <td>15042</td>
+        </tr>
+        <tr>
+            <th>5</th>
+            <td>Returns for day 0–3 event period</td>
+            <td>76585</td>
+            <td>87</td>
+        </tr>
+        <tr>
+            <th>6</th>
+            <td>At least 60 days of volume prior to file date (used to caluclate turnover)</td>
+            <td>71762</td>
+            <td>4823</td>
+        </tr>
+        <tr>
+            <th>7</th>
+            <td>Book-to-market COMPUSTAT data available andbook value &gt; 0</td>
+            <td>52830</td>
+            <td>18932</td>
+        </tr>
+        <tr>
+            <th>8</th>
+            <td>Number of words in 10-K ≥ 2,000</td>
+            <td>48903</td>
+            <td>3927</td>
+        </tr>
+    </tbody>
+</table>

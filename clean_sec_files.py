@@ -190,10 +190,11 @@ def test():
 
 
 
-    parse_one_file('QTR1/20080222_10-K_edgar_data_1000229_0001000229-08-000005_1.txt')
+    # parse_one_file('QTR1/20080222_10-K_edgar_data_1000229_0001000229-08-000005_1.txt')
 
-    parse_one_file('QTR1/20110228_10-K_edgar_data_73309_0001193125-11-049351_1.txt')
+    # parse_one_file('QTR1/20110228_10-K_edgar_data_73309_0001193125-11-049351_1.txt')
+    parse_one_file('QTR4/19961206_10-K-A_edgar_data_846876_0000891554-96-000905_1.txt')
 
 if __name__ == '__main__':
-    main()
-    # test()
+    # main()
+    test()

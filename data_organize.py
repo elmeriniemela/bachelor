@@ -86,6 +86,7 @@ def get_data_dict(master_row, book_value_df, sic_mapping, lm_dictionary, ccmlink
         'LPERMNO_unique': None,
         'LPERMCO': None,
         'LPERMCO_unique': None,
+        'shrcd': None,
         'ccmlinktable_com_names': None,
         'nasdaq_dummy': None, 
         'price_minus_one_day': None, 
@@ -206,6 +207,7 @@ def _fill_financial_data(data, master_row, book_value_df, sic_mapping, ccmlinkta
     data['LPERMCO'] = permno_match['LPERMCO'].value_counts().idxmax()
     data['LPERMCO_unique'] = len(permno_match['LPERMCO'].unique())
 
+    data['shrcd'] = permno_match['shrcd'].value_counts().idxmax()
     # This is for debugging
     data['ccmlinktable_com_names'] = ';'.join(set(name.upper() for name in permno_match['conm']))
 
@@ -305,7 +307,7 @@ def test():
         'average_word_length': 0, # 15
         'vocabulary': 0, # 16
     }
-    fname = '/media/elmeri/T5-SSD/bachelor/parsed/2011/QTR1/20110228_10-K_edgar_data_73309_0001193125-11-049351_1.txt'
+    fname = '/tmp/test.txt'
     _fill_textual_data(textual_data, fname, lm_dictionary)
     import pdb; pdb.set_trace()
     print(textual_data)
@@ -316,5 +318,5 @@ def main():
         edit_master(MAIN, PERMNO)
 
 if __name__ == '__main__':
-    main()
-    # test()
+    # main()
+    test()
