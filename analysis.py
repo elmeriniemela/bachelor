@@ -9,8 +9,8 @@ import matplotlib.pyplot as plt
 from scipy.stats.mstats import winsorize
 import pandas_profiling
 
-def do_full_data_profiling(MAIN):
-    print("Creating full data profiling...")
+def do_full_data_profiling(MAIN, year_bgn, year_end, filename):
+    print('Creating full data profiling from {} to {}. Saving to {}'.format(year_bgn, year_end, filename))
     profiling_vars = [
         'RET_qeom',
         'percent_negative', 
@@ -25,13 +25,15 @@ def do_full_data_profiling(MAIN):
         'year',
         'quater',
     ]
-    master = pd.read_sql("select * from master_edited", MAIN, index_col='index')
-    profile = master[profiling_vars].profile_report(title='Data Profiling Report')
-    profile.to_file(output_file="full_dataset.html")
+    master = pd.read_sql("select * from master_edited where year>=%s and year<=%s" % (year_bgn, year_end), MAIN, index_col='index')
+    profile = master[profiling_vars].profile_report(title='Fulldata Profiling Report from {} to {}'.format(year_bgn, year_end))
+    profile.to_file(output_file='docs/' + filename)
+    print('Saved to {}'.format(filename))
 
-def do_sample_profiling(MAIN):
-    print("Creating sample profiling...")
-    master, outcome_var, _ = prepare_analysis(MAIN)
+
+def do_sample_profiling(MAIN, year_bgn, year_end, filename):
+    print('Creating sample profiling from {} to {}. Saving to {}'.format(year_bgn, year_end, filename))
+    master, outcome_var, _ = prepare_analysis(MAIN, year_bgn, year_end)
 
     profiling_vars = [
         outcome_var,
@@ -46,13 +48,14 @@ def do_sample_profiling(MAIN):
         'turnover',
     ]
 
-    profile = master[profiling_vars].profile_report(title='Data Profiling Report')
-    profile.to_file(output_file="index.html")
+    profile = master[profiling_vars].profile_report(title='Data Sample analysis from {} to {}'.format(year_bgn, year_end))
+    profile.to_file(output_file='docs/' + filename)
+    print('Saved to {}'.format(filename))
 
 
 
-def prepare_analysis(MAIN):
-    master = pd.read_sql("select * from master_edited", MAIN, index_col='index')
+def prepare_analysis(MAIN, year_bgn, year_end):
+    master = pd.read_sql("select * from master_edited where year>=%s and year<=%s" % (year_bgn, year_end), MAIN, index_col='index')
 
     # Mapping for renaming the colums for profiling
     useful_columns = [
@@ -95,14 +98,14 @@ def prepare_analysis(MAIN):
     master = master[master['price_minus_one_day'] >= 3]
     # Number of words in 10-K >= 2,000
     master = master[master['number_of_words'] >= 2000]
-    master = master[master['year'] >= 2009]
+    # master = master[master['year'] >= 2009]
 
     # Eliminate all rows containing infinite and not nan values 
     master.replace([np.inf, -np.inf], np.nan, inplace=True)
     master = master.dropna(how='any')
 
     # Multiply coefficients
-    # master.loc[:,'RET_qeom'] *= 100
+    # master.loc[:,'excess_returns'] *= 1000
 
     # WINSORIZE
 
@@ -150,7 +153,7 @@ def ols_coef(section, outcome_var, predictor_vars):
 
 
 def do_fama_macbeth_analysis(MAIN):
-    master, outcome_var, predictor_vars = prepare_analysis(MAIN)
+    master, outcome_var, predictor_vars = prepare_analysis(MAIN, C.PARM_BGNYEAR, C.PARM_ENDYEAR)
     
     cross_sections = master.groupby(by=['year', 'quater'])
     cross_section_results = cross_sections.apply(ols_coef, outcome_var, predictor_vars)
@@ -181,7 +184,7 @@ def do_fama_macbeth_analysis(MAIN):
 
 
 def do_normal_analysis(MAIN):
-    master, outcome_var, predictor_vars = prepare_analysis(MAIN)
+    master, outcome_var, predictor_vars = prepare_analysis(MAIN, C.PARM_BGNYEAR, C.PARM_ENDYEAR)
 
     X = master[predictor_vars]
     y = master[outcome_var]
@@ -195,9 +198,11 @@ def do_normal_analysis(MAIN):
 def main():
     with connect(C.MAIN_DB_NAME) as MAIN:
         # do_normal_analysis(MAIN)
-        do_fama_macbeth_analysis(MAIN)
-        # do_sample_profiling(MAIN)
-        # do_full_data_profiling(MAIN)
+        # do_fama_macbeth_analysis(MAIN)
+        # do_sample_profiling(MAIN, 2008, 2018, 'index.html')
+        do_full_data_profiling(MAIN, 2008, 2018, 'full_dataset.html')
+        do_sample_profiling(MAIN, 1994, 2008, 'original_study_sample.html')
+        do_full_data_profiling(MAIN, 1994, 2008, 'original_study_full_dataset.html')
 
 
 if __name__ == '__main__':

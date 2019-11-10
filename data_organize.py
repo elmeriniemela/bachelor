@@ -20,7 +20,6 @@ RE_DOCUMENT = re.compile(r"<DOCUMENT>([\w\W]*?)</DOCUMENT>", re.MULTILINE)
 
 def edit_master(MAIN, PERMNO):
     master = pd.read_sql("select * from master", MAIN, index_col='index')
-    assert len(master) == 114186
 
     master['filingdate'] = pd.to_datetime(master['filingdate'], format='%Y%m%d')
 
@@ -33,7 +32,7 @@ def edit_master(MAIN, PERMNO):
     ccmlinktable['LPERMCO'] = ccmlinktable['LPERMCO'].fillna(0).astype(int)
 
     # Remove links that have expired before 2008 for performance
-    ccmlinktable[(ccmlinktable['LINKENDDT'] > '2007-12-01 00:00:00')]
+    # ccmlinktable[(ccmlinktable['LINKENDDT'] > '2007-12-01 00:00:00')]
 
     lm_dictionary = load_masterdictionary(C.MASTER_DICT_PATH)
 
@@ -97,8 +96,6 @@ def get_data_dict(master_row, book_value_df, sic_mapping, lm_dictionary, ccmlink
         'market_vwretd_qeom': None,
         'turnover': None,
         'book_value_per_share': None,
-        'quater': int(master_row['fname'][3:4]),
-        'year': int(master_row['fname'][5:9]),
     }
     financial_columns_count = len(financial_data.keys())
     _fill_financial_data(financial_data, master_row, book_value_df, sic_mapping, ccmlinktable, market_df, PERMNO)
@@ -124,7 +121,7 @@ def get_data_dict(master_row, book_value_df, sic_mapping, lm_dictionary, ccmlink
     }
 
     if financial_data['RET_qeom'] is not None:
-        fname_path = os.path.join('parsed', str(financial_data['year']), master_row['fname'])
+        fname_path = os.path.join('parsed', str(master_row['year']), master_row['fname'])
         textual_columns_count = len(textual_data.keys())
         _fill_textual_data(textual_data, fname_path, lm_dictionary)
         assert len(textual_data.keys()) == textual_columns_count
@@ -280,7 +277,7 @@ def _fill_financial_data(data, master_row, book_value_df, sic_mapping, ccmlinkta
         data['turnover'] = history['VOL'].sum(axis=0) / FILING_DATE_SHROUT
 
     # Book-to-market COMPUSTAT data available
-    company_values = book_value_df.loc[book_value_df['gvkey'] == data['gvkey']].loc[book_value_df['fyear'] == str(data['year'])]
+    company_values = book_value_df.loc[book_value_df['gvkey'] == data['gvkey']].loc[book_value_df['fyear'] == str(master_row['year'])]
     if company_values.empty:
         return
 

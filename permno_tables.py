@@ -16,7 +16,6 @@ def create_company_tables(ALL_STOCKS, PERMNO):
     perm_cur = PERMNO.cursor()
     for perm_no in perm_numbers:
         create_based_on_permno(ALL_STOCKS, PERMNO, perm_no)
-        perm_cur.execute("CREATE INDEX IF NOT EXISTS date_idx ON `%s`(date)" % perm_no)
 
 
 def perm_number_table_exists(PERMNO, perm_no):

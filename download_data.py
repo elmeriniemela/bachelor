@@ -96,11 +96,9 @@ def main():
     start = time.time()
     print('\n' + time.strftime('%c') + '\nND_SRAF:  Program EDGAR_DownloadForms.py\n')
     print("Downloading {}-{}: {}".format(C.PARM_BGNYEAR, C.PARM_ENDYEAR, C.PARM_FORMS))
-    years = list(range(C.PARM_BGNYEAR, C.PARM_ENDYEAR + 1))
-
-    p = multiprocessing.Pool(4)
+    p = multiprocessing.Pool(8)
     try:
-        p.map(try_download, years)
+        p.map(try_download, C.YEARS_LIST)
     except KeyboardInterrupt:
         print("Caught KeyboardInterrupt, terminating workers")
         p.terminate()

@@ -37,6 +37,8 @@ def master_idx_to_csv(year):
         'filingdate',
         'url',
         'fname',
+        'year',
+        'quater',
     ]
     
     with open(C.PARM_PATH + "{}_MASTER.csv".format(year), 'w') as f_out:
@@ -58,14 +60,16 @@ def master_idx_to_csv(year):
                     record.form,
                     record.filingdate,
                     record.url,
-                    edgar_filename(record, path, file_count)
+                    edgar_filename(record, path, file_count),
+                    year,
+                    qtr,
                 ]
                 assert len(line) == len(COLUMNS)
                 wr.writerow(line)
 
 
 def main():
-    for year in range(C.PARM_BGNYEAR, C.PARM_ENDYEAR + 1):
+    for year in C.YEARS_LIST:
         master_idx_to_csv(year)
 
 if __name__ == '__main__':

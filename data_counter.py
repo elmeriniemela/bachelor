@@ -69,3 +69,7 @@ def describe(CONN):
     print( "Total Number of Columns:\t%d" % totalColumns )
     print( "Total Number of Rows:\t%d" % totalRows )
     print( "Total Number of Cells:\t%d" % totalCells )
+
+
+if __name__ == "__main__":
+    zip_count()

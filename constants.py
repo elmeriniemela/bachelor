@@ -1,9 +1,6 @@
-import glob
 import os
 
-TARGET_FILES = 'data/*.zip'
-FILE_LIST = glob.glob(TARGET_FILES)
-FILE_LIST.sort()
+
 
 """
     Predefined SEC form strings
@@ -33,8 +30,8 @@ f_1X = ['1-A', '1-A/A', '1-K', '1-SA', '1-U', '1-Z']
 #   load from EDGAR_Forms.  (See EDGAR_Forms module for predefined lists.)
 PARM_FORMS = f_10K_X  # or, for example, PARM_FORMS = ['8-K', '8-K/A']
 # 2008-2011 already zipped
-PARM_BGNYEAR = 2008  # User selected bgn period.  Earliest available is 1994
-PARM_ENDYEAR = 2019  # User selected end period.
+PARM_BGNYEAR = 1994  # User selected bgn period.  Earliest available is 1994
+PARM_ENDYEAR = 2008  # User selected end period.
 PARM_BGNQTR = 1  # Beginning quarter of each year
 PARM_ENDQTR = 4  # Ending quarter of each year
 # Path where you will store the downloaded files
@@ -46,6 +43,8 @@ PARM_LOGFILE = ('logs/EDGAR_Download_FORM-X_LogFile_' +
 os.makedirs(os.path.dirname(PARM_LOGFILE), exist_ok=True)
 os.makedirs(PARM_PATH, exist_ok=True)
 
+YEARS_LIST = list(range(PARM_BGNYEAR, PARM_ENDYEAR + 1))
+FILE_LIST = [PARM_PATH + str(year) + '.zip' for year in YEARS_LIST]
 # EDGAR parameter
 PARM_EDGARPREFIX = 'https://www.sec.gov/Archives/'
 
