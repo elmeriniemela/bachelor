@@ -7,6 +7,8 @@
 
 * [Full Data profiling](https://thecodebasesite.github.io/bachelor/full_dataset.html "Full Data profiling")
 * [Sample Data profiling](https://thecodebasesite.github.io/bachelor/index.html "Sample Data profiling")
+* [Original study full data profiling](https://thecodebasesite.github.io/bachelor/original_study_full_dataset.html "Original study full data profiling")
+* [Original study sample data profiling](https://thecodebasesite.github.io/bachelor/original_study_sample.html "Original study sample data profiling")
 
 
 

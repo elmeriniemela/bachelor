@@ -42,7 +42,6 @@ def do_sample_profiling(MAIN, year_bgn, year_end, filename):
         'log_turnover', 
         'log_book_to_market',
         'market_vwretd_qeom',
-        'RET_qeom', 
         'size', 
         'book_to_market', 
         'turnover',
@@ -72,6 +71,7 @@ def prepare_analysis(MAIN, year_bgn, year_end):
         'turnover',
         'year',
         'quater',
+        'fname',
         # 'LPERMNO_unique',
     ]
 
@@ -91,6 +91,8 @@ def prepare_analysis(MAIN, year_bgn, year_end):
 
 
     # FILTERING
+    # Include only first filing in a given year
+    master = master[master['fname'].str.endswith("_1.txt")]
 
     # Book-to-market COMPUSTAT data available and book value>0
     master = master[master['book_to_market'] > 0]
@@ -199,7 +201,7 @@ def main():
     with connect(C.MAIN_DB_NAME) as MAIN:
         # do_normal_analysis(MAIN)
         # do_fama_macbeth_analysis(MAIN)
-        # do_sample_profiling(MAIN, 2008, 2018, 'index.html')
+        do_sample_profiling(MAIN, 2008, 2018, 'index.html')
         do_full_data_profiling(MAIN, 2008, 2018, 'full_dataset.html')
         do_sample_profiling(MAIN, 1994, 2008, 'original_study_sample.html')
         do_full_data_profiling(MAIN, 1994, 2008, 'original_study_full_dataset.html')
