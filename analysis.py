@@ -1,5 +1,5 @@
-
-
+import imgkit
+import subprocess
 from sqlite3 import connect
 import statsmodels.api as sm
 import numpy as np
@@ -68,6 +68,7 @@ def do_sample_profiling(MAIN, year_bgn, year_end, filename):
 def prepare_analysis(MAIN, year_bgn, year_end):
     filtering_summary_rows = []
     master = pd.read_sql("select * from master_edited where year>=%s and year<=%s" % (year_bgn, year_end), MAIN, index_col='index')
+    master = master[(master['form'].str.upper() == '10-K') | (master['form'].str.upper() == '10-K405')]
     filtering_summary_rows.append((
         "Full 10-K Document EDGAR 10-K/10-K405 {}-{} complete sample".format(year_bgn, year_end),
         len(master),
@@ -122,17 +123,17 @@ def prepare_analysis(MAIN, year_bgn, year_end):
         filtering_summary_rows[-1][1] - len(master)
     ))
 
-    # Price on filing date day minus one≥$3
+    # Price on filing date day minus one&ge;$3
     master = master[master['price_minus_one_day'] >= 3]
     filtering_summary_rows.append((
-        "Price on filing date day minus one ≥ $3",
+        "Price on filing date day minus one is greater than $3",
         len(master),
         filtering_summary_rows[-1][1] - len(master)
     ))
 
     master = master[np.isfinite(master['RET_qeom'])]
     filtering_summary_rows.append((
-        "Returns for day 0–3 event period",
+        "Returns for day 0-3 event period",
         len(master),
         filtering_summary_rows[-1][1] - len(master)
     ))
@@ -150,28 +151,32 @@ def prepare_analysis(MAIN, year_bgn, year_end):
     master = master[np.isfinite(master['book_value_per_share'])]
     master = master[master['book_value_per_share'] > 0]
     filtering_summary_rows.append((
-        "Book-to-market COMPUSTAT data available andbook value > 0",
+        "Book-to-market COMPUSTAT data available and book value greater than 0",
         len(master),
         filtering_summary_rows[-1][1] - len(master)
     ))
 
     master = master[master['number_of_words'] >= 2000]
     filtering_summary_rows.append((
-        "Number of words in 10-K ≥ 2,000",
+        "Atleast 2,000 words in 10-K",
         len(master),
         filtering_summary_rows[-1][1] - len(master)
     ))
 
     filtering_summary = pd.DataFrame(filtering_summary_rows, columns=['Source/Filter', 'Sample Size', 'Observations Removed'])
 
-    with open("docs/filtering_summaru.html", 'w') as f_obj:
+    fname = "docs/filtering_summary-{}-{}.html".format(year_bgn, year_end)
+    with open(fname, 'w') as f_obj:
+        filtering_summary = filtering_summary.set_index(['Source/Filter'])
         f_obj.write(BOOTSTRAP)
-        filtering_summary.to_html(buf=f_obj, classes=["table"])
+        f_obj.write(filtering_summary.to_html(classes=["table"]).replace('border="1"', ''))
+        f_obj.write("<br/>\n")
+        f_obj.write("<br/>\n")
+        f_obj.write("Number of unique firms: {}".format(len(master['LPERMNO'].unique())))
+        print(
+            'wkhtmltoimage -f png {} {}'.format(fname, fname.replace('.html', '.png')))
 
 
-
-
-    print("Number of unique firms: ", len(master['LPERMNO'].unique()))
     print("FILTERING DONE\n\n")
 
     master = master[useful_columns]
@@ -241,13 +246,25 @@ def ols_coef(section, outcome_var, predictor_vars):
     return series
 
 
-def do_fama_macbeth_analysis(MAIN):
-    master, outcome_var, predictor_vars = prepare_analysis(MAIN, C.PARM_BGNYEAR, C.PARM_ENDYEAR)
+def variable_renaming(row):
+    mapping = {
+        'const': 'Constant',
+        'percent_negative': 'Negative Word Frequency',
+        'log_size': 'Log(size)',
+        'log_turnover': 'Log(turnover)',
+        'log_book_to_market': 'Log(book-to-market)',
+        'nasdaq_dummy': 'NASDAQ Dummy',
+    }
+    return row.rename(mapping[row.name], inplace=True)
+
+
+def do_fama_macbeth_analysis(MAIN, year_bgn, year_end):
+    master, outcome_var, predictor_vars = prepare_analysis(MAIN, year_bgn, year_end)
     
     cross_sections = master.groupby(by=['year', 'quater'])
     cross_section_results = cross_sections.apply(ols_coef, outcome_var, predictor_vars)
     print(cross_section_results)
-    newey_west_df = pd.DataFrame(columns=['Variable name', 'Coefficient', 'Standard Error', 'P-Value', 'T-Value'])
+    newey_west_df = pd.DataFrame(columns=['Variable name', 'Coefficient', 'Standard Error', 'T-Value'])
     newey_west_df = newey_west_df.set_index(['Variable name'])
     for column_hat in cross_section_results:
         if column_hat == 'r_squared':
@@ -263,20 +280,35 @@ def do_fama_macbeth_analysis(MAIN):
         row = [
             model.params[0], # coef
             model.bse[0], # std_err
-            model.pvalues[0], # p_values
+            # model.pvalues[0], # p_values
             model.tvalues[0], # t_values
         ]
         newey_west_df.loc[column_hat] = row
 
-    print("Average Adjusted R-Squared: ", cross_section_results['r_squared'].mean())
+    fname = "docs/results{}-{}.html".format(year_bgn, year_end)
+    newey_west_df = newey_west_df.head(6)
+    mapping = {
+        'const': 'Constant',
+        'percent_negative': 'Negative Word Frequency',
+        'log_size': 'Log(size)',
+        'log_turnover': 'Log(turnover)',
+        'log_book_to_market': 'Log(book-to-market)',
+        'nasdaq_dummy': 'NASDAQ Dummy',
+    }
+    newey_west_df.rename(index=mapping, inplace=True)
     print(newey_west_df)
-    with open("docs/results.html", 'w') as f_obj:
+
+    with open(fname, 'w') as f_obj:
         f_obj.write(BOOTSTRAP)
-        newey_west_df.to_html(buf=f_obj, classes=["table"])
+        f_obj.write(newey_west_df.to_html(classes=["table"]).replace('border="1"', ''))
+        f_obj.write("<br/>\n")
+        f_obj.write("<br/>\n")
+        f_obj.write("Average Adjusted R-Squared: {:.2f} %".format(cross_section_results['r_squared'].mean() * 100))
+        print('wkhtmltoimage -f png {} {}'.format(fname, fname.replace('.html', '.png')))
 
 
 def do_normal_analysis(MAIN):
-    master, outcome_var, predictor_vars = prepare_analysis(MAIN, C.PARM_BGNYEAR, C.PARM_ENDYEAR)
+    master, outcome_var, predictor_vars = prepare_analysis(MAIN, year_bgn, year_end)
 
     X = master[predictor_vars]
     y = master[outcome_var]
@@ -290,7 +322,8 @@ def do_normal_analysis(MAIN):
 def main():
     with connect(C.MAIN_DB_NAME) as MAIN:
         # do_normal_analysis(MAIN)
-        do_fama_macbeth_analysis(MAIN)
+        do_fama_macbeth_analysis(MAIN, 1994, 2008)
+        do_fama_macbeth_analysis(MAIN, 2008, 2018)
         # do_sample_profiling(MAIN, 2008, 2018, 'index.html')
         # do_full_data_profiling(MAIN, 2008, 2018, 'full_dataset.html')
         # do_sample_profiling(MAIN, 1994, 2008, 'original_study_sample.html')
