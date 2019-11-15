@@ -173,11 +173,6 @@ def prepare_analysis(MAIN, year_bgn, year_end):
         f_obj.write("<br/>\n")
         f_obj.write("<br/>\n")
         f_obj.write("Number of unique firms: {}".format(len(master['LPERMNO'].unique())))
-        print(
-            'wkhtmltoimage -f png {} {}'.format(fname, fname.replace('.html', '.png')))
-
-
-    print("FILTERING DONE\n\n")
 
     master = master[useful_columns]
 
@@ -201,8 +196,8 @@ def prepare_analysis(MAIN, year_bgn, year_end):
         len(master),
         filtering_summary_rows[-1][1] - len(master)
     ))
-    # Multiply coefficients
-    # master.loc[:,'excess_returns'] *= 1000
+    # Display as percentage insted of decimal
+    master.loc[:,'excess_returns'] *= 100
 
     # WINSORIZE
 
@@ -304,7 +299,6 @@ def do_fama_macbeth_analysis(MAIN, year_bgn, year_end):
         f_obj.write("<br/>\n")
         f_obj.write("<br/>\n")
         f_obj.write("Average Adjusted R-Squared: {:.2f} %".format(cross_section_results['r_squared'].mean() * 100))
-        print('wkhtmltoimage -f png {} {}'.format(fname, fname.replace('.html', '.png')))
 
 
 def do_normal_analysis(MAIN):
@@ -322,12 +316,12 @@ def do_normal_analysis(MAIN):
 def main():
     with connect(C.MAIN_DB_NAME) as MAIN:
         # do_normal_analysis(MAIN)
-        do_fama_macbeth_analysis(MAIN, 1994, 2008)
-        do_fama_macbeth_analysis(MAIN, 2008, 2018)
+        # do_fama_macbeth_analysis(MAIN, 1994, 2008)
+        # do_fama_macbeth_analysis(MAIN, 2008, 2018)
         # do_sample_profiling(MAIN, 2008, 2018, 'index.html')
-        # do_full_data_profiling(MAIN, 2008, 2018, 'full_dataset.html')
-        # do_sample_profiling(MAIN, 1994, 2008, 'original_study_sample.html')
-        # do_full_data_profiling(MAIN, 1994, 2008, 'original_study_full_dataset.html')
+        do_full_data_profiling(MAIN, 2008, 2018, 'full_dataset.html')
+        do_sample_profiling(MAIN, 1994, 2008, 'original_study_sample.html')
+        do_full_data_profiling(MAIN, 1994, 2008, 'original_study_full_dataset.html')
 
 
 if __name__ == '__main__':
