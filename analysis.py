@@ -316,19 +316,22 @@ def do_summary_statistics(MAIN):
     master1.loc[:,'nasdaq_dummy'] *= 100
     master2.loc[:,'nasdaq_dummy'] *= 100
 
+    summary_df = pd.DataFrame(columns=[str(i) for i in range(6)])
+    summary_df.columns = pd.MultiIndex.from_product([
+        ['Original Sample (1994-2008)', 'New Sample (2008 - 2018)'], 
+        ['Mean', 'Median', 'Standard Deviation']
+    ])
+    summary_df.index = pd.Index([], name='Variable Name')
 
     summary_vars =  [
-        ('percent_negative','Negative Word Frequency', '%'),
-        ('excess_returns','Event period [0, 3] excess return', '%'),
-        ('size', 'Size', '$'),
-        ('turnover','Turnover', ''),
-        ('book_to_market','Book-to-market', ''),
-        ('nasdaq_dummy','NASDAQ Dummy', '%'),
+        ('percent_negative', 'Negative Word Frequency', '%'),
+        ('excess_returns', 'Event period [0, 3] excess return', '%'),
+        ('size', 'Size (billions $)', '$'),
+        ('turnover', 'Turnover', ''),
+        ('book_to_market', 'Book-to-market', ''),
+        ('nasdaq_dummy', 'NASDAQ Dummy', '%'),
     ]
 
-    summary_df = pd.DataFrame(columns=[str(i) for i in range(6)])
-    summary_df.columns = pd.MultiIndex.from_product([['Original Sample (1994-2008)', 'New Sample (2008 - 2018)'],['Mean','Median', 'Standard Deviation']])
-    summary_df.index = pd.Index([], name='Variable Name')
 
     for var, new_name, char in summary_vars:
         row = [
@@ -348,6 +351,28 @@ def do_summary_statistics(MAIN):
     print(summary_df)
 
 
+def do_quantile_graph(MAIN):
+    master, _, _ = prepare_analysis(MAIN, 1994, 2008)
+
+    X = 'Quintile (based on proportion of negative words)'
+
+    master[X] = pd.qcut(master['percent_negative'], q=5)
+    series = master.groupby(by=[X]).apply(lambda df: df['excess_returns'].median())
+    series.index = pd.Index(['Low', '2', '3', '4', 'High'], name=X)
+    plotted = series.plot(label='Original Sample (1994-2008)')
+    plotted.set_ylabel('Median Filing Period Excess Return')
+
+    master, _, _ = prepare_analysis(MAIN, 2008, 2018)
+
+    master[X] = pd.qcut(master['percent_negative'], q=5)
+    series = master.groupby(by=[X]).apply(lambda df: df['excess_returns'].median())
+    series.index = pd.Index(['Low', '2', '3', '4', 'High'], name=X)
+    plotted = series.plot(label='New Sample (2008-2018)')
+    plt.legend()
+    plt.show()
+
+
+
 def main():
     with connect(C.MAIN_DB_NAME) as MAIN:
         # do_fama_macbeth_analysis(MAIN, 1994, 2008)
@@ -357,6 +382,7 @@ def main():
         # do_sample_profiling(MAIN, 1994, 2008, 'original_study_sample.html')
         # do_full_data_profiling(MAIN, 1994, 2008, 'original_study_full_dataset.html')
         do_summary_statistics(MAIN)
+        do_quantile_graph(MAIN)
 
 
 if __name__ == '__main__':
