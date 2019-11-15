@@ -199,6 +199,13 @@ def prepare_analysis(MAIN, year_bgn, year_end):
     # Display as percentage insted of decimal
     master.loc[:,'excess_returns'] *= 100
 
+
+    # This should have been done in data_organize.py since shares_outstanding was expressed in thousands
+    master.loc[:,'turnover'] /= 1000
+
+    # Shares outstanding is in thousands so to get size in billions we will divide by million
+    master.loc[:,'size'] /= 1_000_000
+
     # WINSORIZE
 
     # we winsorize the book-to-market variable at the 1% level.
@@ -301,27 +308,55 @@ def do_fama_macbeth_analysis(MAIN, year_bgn, year_end):
         f_obj.write("Average Adjusted R-Squared: {:.2f} %".format(cross_section_results['r_squared'].mean() * 100))
 
 
-def do_normal_analysis(MAIN):
-    master, outcome_var, predictor_vars = prepare_analysis(MAIN, year_bgn, year_end)
+def do_summary_statistics(MAIN):
+    master1, outcome_var, predictor_vars = prepare_analysis(MAIN, 1994, 2008)
+    master2, _, _ = prepare_analysis(MAIN, 2008, 2018)
+    ff_categories = {n for n in master1['ff_industry'].unique() if n in master1.columns}
 
-    X = master[predictor_vars]
-    y = master[outcome_var]
+    master1.loc[:,'nasdaq_dummy'] *= 100
+    master2.loc[:,'nasdaq_dummy'] *= 100
 
-    # Add constant to regression
-    X = sm.add_constant(X)
-    model = sm.OLS(y, X).fit()
-    print(model.summary())
+
+    summary_vars =  [
+        ('percent_negative','Negative Word Frequency', '%'),
+        ('excess_returns','Event period [0, 3] excess return', '%'),
+        ('size', 'Size', '$'),
+        ('turnover','Turnover', ''),
+        ('book_to_market','Book-to-market', ''),
+        ('nasdaq_dummy','NASDAQ Dummy', '%'),
+    ]
+
+    summary_df = pd.DataFrame(columns=[str(i) for i in range(6)])
+    summary_df.columns = pd.MultiIndex.from_product([['Original Sample (1994-2008)', 'New Sample (2008 - 2018)'],['Mean','Median', 'Standard Deviation']])
+    summary_df.index = pd.Index([], name='Variable Name')
+
+    for var, new_name, char in summary_vars:
+        row = [
+            '{:.2f}{}'.format(master1[var].mean(), char),
+            '{:.2f}{}'.format(master1[var].median(), char),
+            '{:.2f}{}'.format(master1[var].std(), char),
+            '{:.2f}{}'.format(master2[var].mean(), char),
+            '{:.2f}{}'.format(master2[var].median(), char),
+            '{:.2f}{}'.format(master2[var].std(), char),
+        ]
+        summary_df.loc[new_name] = row
+
+    with open("docs/summary_statistics.html", 'w') as f_obj:
+        f_obj.write(BOOTSTRAP)
+        f_obj.write(summary_df.to_html(classes=["table"]).replace('border="1"', ''))
+
+    print(summary_df)
 
 
 def main():
     with connect(C.MAIN_DB_NAME) as MAIN:
-        # do_normal_analysis(MAIN)
         # do_fama_macbeth_analysis(MAIN, 1994, 2008)
         # do_fama_macbeth_analysis(MAIN, 2008, 2018)
         # do_sample_profiling(MAIN, 2008, 2018, 'index.html')
-        do_full_data_profiling(MAIN, 2008, 2018, 'full_dataset.html')
-        do_sample_profiling(MAIN, 1994, 2008, 'original_study_sample.html')
-        do_full_data_profiling(MAIN, 1994, 2008, 'original_study_full_dataset.html')
+        # do_full_data_profiling(MAIN, 2008, 2018, 'full_dataset.html')
+        # do_sample_profiling(MAIN, 1994, 2008, 'original_study_sample.html')
+        # do_full_data_profiling(MAIN, 1994, 2008, 'original_study_full_dataset.html')
+        do_summary_statistics(MAIN)
 
 
 if __name__ == '__main__':
