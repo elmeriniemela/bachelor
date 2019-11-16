@@ -237,14 +237,21 @@ def prepare_analysis(MAIN, year_bgn, year_end):
     return master, outcome_var, predictor_vars
     
 
-def ols_coef(section, outcome_var, predictor_vars):
+def ols_coef(section, outcome_var, predictor_vars, len_N):
     X = section[predictor_vars]
     y = section[outcome_var]
     X = sm.add_constant(X)
     model = sm.OLS(y, X).fit()
     series = model.params
+
+    # The estimates for each period are weighted by frequency, 
+    # since the calendar distribution of file dates is clustered 
+    # around specific dates (see Griffin (2003)).
+    series *= len(section) / len_N
+
     # Add r_squared so we can take the mean later
     series['r_squared'] = model.rsquared_adj
+    
     return series
 
 
@@ -264,7 +271,7 @@ def do_fama_macbeth_analysis(MAIN, year_bgn, year_end):
     master, outcome_var, predictor_vars = prepare_analysis(MAIN, year_bgn, year_end)
     
     cross_sections = master.groupby(by=['year', 'quater'])
-    cross_section_results = cross_sections.apply(ols_coef, outcome_var, predictor_vars)
+    cross_section_results = cross_sections.apply(ols_coef, outcome_var, predictor_vars, len(master))
     print(cross_section_results)
     newey_west_df = pd.DataFrame(columns=['Variable name', 'Coefficient', 'Standard Error', 'T-Value'])
     newey_west_df = newey_west_df.set_index(['Variable name'])
@@ -318,7 +325,7 @@ def do_summary_statistics(MAIN):
 
     summary_df = pd.DataFrame(columns=[str(i) for i in range(6)])
     summary_df.columns = pd.MultiIndex.from_product([
-        ['Original Sample (1994-2008)', 'New Sample (2008 - 2018)'], 
+        ['Original Sample 1994-2008\n(N = {})'.format(len(master1)), 'New Sample 2008-2018\n(N = {})'.format(len(master2))], 
         ['Mean', 'Median', 'Standard Deviation']
     ])
     summary_df.index = pd.Index([], name='Variable Name')
@@ -346,7 +353,10 @@ def do_summary_statistics(MAIN):
 
     with open("docs/summary_statistics.html", 'w') as f_obj:
         f_obj.write(BOOTSTRAP)
-        f_obj.write(summary_df.to_html(classes=["table"]).replace('border="1"', ''))
+        f_obj.write(summary_df.to_html(classes=["table"])\
+            .replace('border="1"', '')\
+            .replace('\\n', '<br/>')
+        )
 
     print(summary_df)
 
@@ -382,7 +392,7 @@ def main():
         # do_sample_profiling(MAIN, 1994, 2008, 'original_study_sample.html')
         # do_full_data_profiling(MAIN, 1994, 2008, 'original_study_full_dataset.html')
         do_summary_statistics(MAIN)
-        do_quantile_graph(MAIN)
+        # do_quantile_graph(MAIN)
 
 
 if __name__ == '__main__':
