@@ -255,18 +255,6 @@ def ols_coef(section, outcome_var, predictor_vars, len_N):
     return series
 
 
-def variable_renaming(row):
-    mapping = {
-        'const': 'Constant',
-        'percent_negative': 'Negative Word Frequency',
-        'log_size': 'Log(size)',
-        'log_turnover': 'Log(turnover)',
-        'log_book_to_market': 'Log(book-to-market)',
-        'nasdaq_dummy': 'NASDAQ Dummy',
-    }
-    return row.rename(mapping[row.name], inplace=True)
-
-
 def do_fama_macbeth_analysis(MAIN, year_bgn, year_end):
     master, outcome_var, predictor_vars = prepare_analysis(MAIN, year_bgn, year_end)
     
@@ -276,7 +264,7 @@ def do_fama_macbeth_analysis(MAIN, year_bgn, year_end):
     newey_west_df = pd.DataFrame(columns=['Variable name', 'Coefficient', 'Standard Error', 'T-Value'])
     newey_west_df = newey_west_df.set_index(['Variable name'])
     for column_hat in cross_section_results:
-        if column_hat == 'r_squared':
+        if column_hat in {'r_squared', 'const'}:
             # This is not supposed to be t tested
             # we saved it only for the average
             continue
@@ -289,21 +277,19 @@ def do_fama_macbeth_analysis(MAIN, year_bgn, year_end):
         row = [
             model.params[0], # coef
             model.bse[0], # std_err
-            # model.pvalues[0], # p_values
             model.tvalues[0], # t_values
         ]
         newey_west_df.loc[column_hat] = row
 
     fname = "docs/results{}-{}.html".format(year_bgn, year_end)
-    newey_west_df = newey_west_df.head(6)
     mapping = {
-        'const': 'Constant',
         'percent_negative': 'Negative Word Frequency',
         'log_size': 'Log(size)',
         'log_turnover': 'Log(turnover)',
         'log_book_to_market': 'Log(book-to-market)',
         'nasdaq_dummy': 'NASDAQ Dummy',
     }
+    newey_west_df = newey_west_df.head(len(mapping))
     newey_west_df.rename(index=mapping, inplace=True)
     print(newey_west_df)
 
@@ -311,8 +297,7 @@ def do_fama_macbeth_analysis(MAIN, year_bgn, year_end):
         f_obj.write(BOOTSTRAP)
         f_obj.write(newey_west_df.to_html(classes=["table"]).replace('border="1"', ''))
         f_obj.write("<br/>\n")
-        f_obj.write("<br/>\n")
-        f_obj.write("Average Adjusted R-Squared: {:.2f} %".format(cross_section_results['r_squared'].mean() * 100))
+        f_obj.write("<b style='margin: 1.5rem !important; font-size: 20px'>Average Adjusted R-Squared: {:.2f} %</b>".format(cross_section_results['r_squared'].mean() * 100))
 
 
 def do_summary_statistics(MAIN):
@@ -385,13 +370,13 @@ def do_quantile_graph(MAIN):
 
 def main():
     with connect(C.MAIN_DB_NAME) as MAIN:
-        # do_fama_macbeth_analysis(MAIN, 1994, 2008)
-        # do_fama_macbeth_analysis(MAIN, 2008, 2018)
+        do_fama_macbeth_analysis(MAIN, 1994, 2008)
+        do_fama_macbeth_analysis(MAIN, 2008, 2018)
         # do_sample_profiling(MAIN, 2008, 2018, 'index.html')
         # do_full_data_profiling(MAIN, 2008, 2018, 'full_dataset.html')
         # do_sample_profiling(MAIN, 1994, 2008, 'original_study_sample.html')
         # do_full_data_profiling(MAIN, 1994, 2008, 'original_study_full_dataset.html')
-        do_summary_statistics(MAIN)
+        # do_summary_statistics(MAIN)
         # do_quantile_graph(MAIN)
 
 
