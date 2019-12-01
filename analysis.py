@@ -151,7 +151,7 @@ def prepare_analysis(MAIN, year_bgn, year_end):
     master = master[np.isfinite(master['book_value_per_share'])]
     master = master[master['book_value_per_share'] > 0]
     filtering_summary_rows.append((
-        "Book-to-market COMPUSTAT data available and book value greater than 0",
+        "Book-to-market COMPUSTAT data available and book value greater than zero",
         len(master),
         filtering_summary_rows[-1][1] - len(master)
     ))
@@ -163,16 +163,16 @@ def prepare_analysis(MAIN, year_bgn, year_end):
         filtering_summary_rows[-1][1] - len(master)
     ))
 
-    filtering_summary = pd.DataFrame(filtering_summary_rows, columns=['Source/Filter', 'Sample Size', 'Observations Removed'])
+    # filtering_summary = pd.DataFrame(filtering_summary_rows, columns=['Source/Filter', 'Sample Size', 'Observations Removed'])
+    # filtering_summary = filtering_summary.set_index(['Source/Filter'])
 
-    fname = "docs/filtering_summary-{}-{}.html".format(year_bgn, year_end)
-    with open(fname, 'w') as f_obj:
-        filtering_summary = filtering_summary.set_index(['Source/Filter'])
-        f_obj.write(BOOTSTRAP)
-        f_obj.write(filtering_summary.to_html(classes=["table"]).replace('border="1"', ''))
-        f_obj.write("<br/>\n")
-        f_obj.write("<br/>\n")
-        f_obj.write("Number of unique firms: {}".format(len(master['LPERMNO'].unique())))
+    # fname = "docs/filtering_summary-{}-{}.html".format(year_bgn, year_end)
+    # with open(fname, 'w') as f_obj:
+    #     f_obj.write(BOOTSTRAP)
+    #     f_obj.write(filtering_summary.to_html(classes=["table"]).replace('border="1"', ''))
+    #     f_obj.write("<br/>\n")
+    #     f_obj.write("<br/>\n")
+    #     f_obj.write("Number of unique firms: {}".format(len(master['LPERMNO'].unique())))
 
     master = master[useful_columns]
 
@@ -192,7 +192,7 @@ def prepare_analysis(MAIN, year_bgn, year_end):
     master.replace([np.inf, -np.inf], np.nan, inplace=True)
     master = master.dropna(how='any')
     filtering_summary_rows.append((
-        "Rows containing any nan values",
+        "Rows containing any missing values",
         len(master),
         filtering_summary_rows[-1][1] - len(master)
     ))
@@ -234,7 +234,7 @@ def prepare_analysis(MAIN, year_bgn, year_end):
     ff_categories = [n for n in master['ff_industry'].unique() if n in master.columns]
     predictor_vars.extend(ff_categories)
 
-    return master, outcome_var, predictor_vars
+    return master, outcome_var, predictor_vars, filtering_summary_rows
     
 
 def ols_coef(section, outcome_var, predictor_vars, len_N):
@@ -301,9 +301,38 @@ def do_fama_macbeth_analysis(MAIN, year_bgn, year_end):
 
 
 def do_summary_statistics(MAIN):
-    master1, outcome_var, predictor_vars = prepare_analysis(MAIN, 1994, 2008)
-    master2, _, _ = prepare_analysis(MAIN, 2008, 2018)
-    ff_categories = {n for n in master1['ff_industry'].unique() if n in master1.columns}
+    master1, _, _, filtering_summary_rows1 = prepare_analysis(MAIN, 1994, 2008)
+    master2, _, _, filtering_summary_rows2 = prepare_analysis(MAIN, 2008, 2018)
+
+
+    filtering_summary_df = pd.DataFrame(columns=[str(i) for i in range(4)])
+    filtering_summary_df.columns = pd.MultiIndex.from_product([
+        ['Original Sample 1994-2008\n(N = {})'.format(len(master1)), 'New Sample 2008-2018\n(N = {})'.format(len(master2))], 
+        ['Sample Size', 'Observations\nRemoved']
+    ])
+    filtering_summary_df.index = pd.Index([], name='Source/Filter')
+
+    for row1, row2 in zip(filtering_summary_rows1, filtering_summary_rows2):
+        filter_name, sample1, removed1 = row1
+        filter_name, sample2, removed2 = row2
+        row = [
+            sample1,
+            removed1,
+            sample2,
+            removed2,
+        ]
+        filtering_summary_df.loc[filter_name] = row
+
+    with open('docs/filtering_summary.html', 'w') as f_obj:
+        f_obj.write(BOOTSTRAP)
+        f_obj.write(filtering_summary_df.to_html(classes=["table"])\
+            .replace('border="1"', '')\
+            .replace('\\n', '<br/>')
+        )
+
+
+
+
 
     master1.loc[:,'nasdaq_dummy'] *= 100
     master2.loc[:,'nasdaq_dummy'] *= 100
@@ -370,13 +399,13 @@ def do_quantile_graph(MAIN):
 
 def main():
     with connect(C.MAIN_DB_NAME) as MAIN:
-        do_fama_macbeth_analysis(MAIN, 1994, 2008)
-        do_fama_macbeth_analysis(MAIN, 2008, 2018)
+        # do_fama_macbeth_analysis(MAIN, 1994, 2008)
+        # do_fama_macbeth_analysis(MAIN, 2008, 2018)
         # do_sample_profiling(MAIN, 2008, 2018, 'index.html')
         # do_full_data_profiling(MAIN, 2008, 2018, 'full_dataset.html')
         # do_sample_profiling(MAIN, 1994, 2008, 'original_study_sample.html')
         # do_full_data_profiling(MAIN, 1994, 2008, 'original_study_full_dataset.html')
-        # do_summary_statistics(MAIN)
+        do_summary_statistics(MAIN)
         # do_quantile_graph(MAIN)
 
 
