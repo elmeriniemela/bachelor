@@ -1,5 +1,5 @@
 ## Negative words in 10-K’s and filing period stock returns
-### A a replication study using sentiment analysis for my bachelors degree
+### A a replication study using sentiment analysis
 
 
 ### Abstract
