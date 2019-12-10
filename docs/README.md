@@ -31,6 +31,5 @@ Previous research has developed a word list specifically designed to classify th
 
 
 
-![alt text](https://raw.githubusercontent.com/thecodebasesite/bachelor/master/docs/results1994-2008.png)
-![alt text](https://raw.githubusercontent.com/thecodebasesite/bachelor/master/docs/results2008-2018.png)
+![alt text](https://raw.githubusercontent.com/thecodebasesite/bachelor/master/docs/quantile_graph.png)
 

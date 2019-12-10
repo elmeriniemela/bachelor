@@ -394,14 +394,14 @@ def do_quantile_graph(MAIN):
 
 def main():
     with connect(C.MAIN_DB_NAME) as MAIN:
-        do_fama_macbeth_analysis(MAIN, 1994, 2008)
-        do_fama_macbeth_analysis(MAIN, 2008, 2018)
+        # do_fama_macbeth_analysis(MAIN, 1994, 2008)
+        # do_fama_macbeth_analysis(MAIN, 2008, 2018)
         # do_sample_profiling(MAIN, 2008, 2018, 'index.html')
         # do_full_data_profiling(MAIN, 2008, 2018, 'full_dataset.html')
         # do_sample_profiling(MAIN, 1994, 2008, 'original_study_sample.html')
         # do_full_data_profiling(MAIN, 1994, 2008, 'original_study_full_dataset.html')
         # do_summary_statistics(MAIN)
-        # do_quantile_graph(MAIN)
+        do_quantile_graph(MAIN)
 
 
 if __name__ == '__main__':
