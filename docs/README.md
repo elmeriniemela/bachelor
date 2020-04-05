@@ -9,8 +9,8 @@ Previous research has developed a word list specifically designed to classify th
 
 
 ### Bachelor's thesis paper
-* [Full Paper](https://thecodebasesite.github.io/bachelor/elmeri_niemela_bachelor_thesis_final.pdf "Full Paper")
-* [Executive summary in Finnish](https://thecodebasesite.github.io/bachelor/elmeri_niemela_maturity_test.pdf "Executive summary in Finnish")
+* [Full Paper](https://elmeriniemela.github.io/bachelor/elmeri_niemela_bachelor_thesis_final.pdf "Full Paper")
+* [Executive summary in Finnish](https://elmeriniemela.github.io/bachelor/elmeri_niemela_maturity_test.pdf "Executive summary in Finnish")
 
 
 ### Original study
@@ -21,15 +21,15 @@ Previous research has developed a word list specifically designed to classify th
 ### Data profiling
 
 
-* [Profiling of un-filtered dataset 2008-2018](https://thecodebasesite.github.io/bachelor/full_dataset.html "Profiling of un-filtered dataset 2008-2018")
-* [Profiling of un-filtered dataset 1994-2008](https://thecodebasesite.github.io/bachelor/original_study_full_dataset.html "Profiling of un-filtered dataset 1994-2008")
-* [Sample Filtering Summary](https://thecodebasesite.github.io/bachelor/filtering_summary.html "Sample Filtering Summary")
-* [Sample profiling 2008-2018](https://thecodebasesite.github.io/bachelor/index.html "Sample profiling 2008-2018")
-* [Sample profiling 1994-2008](https://thecodebasesite.github.io/bachelor/original_study_sample.html "Sample profiling 1994-2008")
-* [Regression results 1994-2008](https://thecodebasesite.github.io/bachelor/results1994-2008.html "Regression results 1994-2008")
-* [Regression results 2008-2018](https://thecodebasesite.github.io/bachelor/results2008-2018.html "Regression results 2008-2018")
+* [Profiling of un-filtered dataset 2008-2018](https://elmeriniemela.github.io/bachelor/full_dataset.html "Profiling of un-filtered dataset 2008-2018")
+* [Profiling of un-filtered dataset 1994-2008](https://elmeriniemela.github.io/bachelor/original_study_full_dataset.html "Profiling of un-filtered dataset 1994-2008")
+* [Sample Filtering Summary](https://elmeriniemela.github.io/bachelor/filtering_summary.html "Sample Filtering Summary")
+* [Sample profiling 2008-2018](https://elmeriniemela.github.io/bachelor/index.html "Sample profiling 2008-2018")
+* [Sample profiling 1994-2008](https://elmeriniemela.github.io/bachelor/original_study_sample.html "Sample profiling 1994-2008")
+* [Regression results 1994-2008](https://elmeriniemela.github.io/bachelor/results1994-2008.html "Regression results 1994-2008")
+* [Regression results 2008-2018](https://elmeriniemela.github.io/bachelor/results2008-2018.html "Regression results 2008-2018")
 
 
 
-![alt text](https://raw.githubusercontent.com/thecodebasesite/bachelor/master/docs/quantile_graph.png)
+![alt text](https://raw.githubusercontent.com/elmeriniemela/bachelor/master/docs/quantile_graph.png)
 
